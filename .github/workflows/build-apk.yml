@@ -12,13 +12,21 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Build APK
+      - name: Install system deps
         run: |
-          docker run --rm \
-            -v ${{ github.workspace }}:/app \
-            -w /app \
-            kivy/buildozer:latest \
-            android debug
+          sudo apt-get update
+          sudo apt-get install -y \
+            openjdk-17-jdk-headless \
+            autoconf automake libtool \
+            cmake zip unzip \
+            libffi-dev libssl-dev \
+            python3-pip
+
+      - name: Install buildozer
+        run: pip install buildozer cython
+
+      - name: Build APK
+        run: buildozer android debug
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
