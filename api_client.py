@@ -103,7 +103,7 @@ class ApiClient:
     def get_student_id(self) -> str:
         r = self._get(f"{HOST}/_UserCenter/MB/index.aspx")
         if r.status_code == 200:
-            soup = BeautifulSoup(r.text, "lxml")
+            soup = BeautifulSoup(r.text, "html.parser")
             el = soup.find(id="hidUID")
             if el:
                 return el.get("value", "")
@@ -131,7 +131,7 @@ class ApiClient:
         if r.status_code != 200 or "HFChecktype" not in r.text:
             return None
 
-        soup = BeautifulSoup(r.text, "lxml")
+        soup = BeautifulSoup(r.text, "html.parser")
 
         def val(elm_id):
             el = soup.find(id=elm_id)
@@ -162,7 +162,7 @@ class ApiClient:
     def do_qrcode_signin(self, state: str) -> str:
         r = self._get(f"{HOST}/_CheckIn/MB/QrCodeCheckOK.aspx?state={state}")
         if r.status_code == 200:
-            soup = BeautifulSoup(r.text, "lxml")
+            soup = BeautifulSoup(r.text, "html.parser")
             el = soup.find(id="DivOK")
             if el:
                 text = el.get_text()
