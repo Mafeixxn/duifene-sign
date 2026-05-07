@@ -12,10 +12,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Build APK with Buildozer
-        uses: ArtemSBulgakov/buildozer-action@v1
-        with:
-          repository_root: .
+      - name: Build APK
+        run: |
+          docker run --rm \
+            -v ${{ github.workspace }}:/app \
+            -w /app \
+            kivy/buildozer:latest \
+            buildozer android debug
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
