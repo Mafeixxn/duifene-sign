@@ -307,7 +307,29 @@ class SignPanel(BoxLayout):
 
 
 class SignApp(App):
+    def _setup_font(self):
+        """Find a system CJK font on Android so Chinese text renders."""
+        import os as _os
+        _cjk_candidates = [
+            "/system/fonts/NotoSansCJK-Regular.ttc",
+            "/system/fonts/DroidSansFallback.ttf",
+            "/system/fonts/NotoSansSC-Regular.otf",
+            "/system/fonts/MiSans-Regular.ttf",
+            "/system/fonts/HarmonyOS_Sans_SC_Regular.ttf",
+            "/system/fonts/SourceHanSansSC-Regular.otf",
+        ]
+        for _p in _cjk_candidates:
+            if _os.path.exists(_p):
+                from kivy.core.text import LabelBase
+                try:
+                    LabelBase.register(name="Roboto", fn_regular=_p)
+                except Exception:
+                    pass
+                return
+
     def build(self):
+        if platform == "android":
+            self._setup_font()
         self.title = "对分易自动签到"
         return SignPanel()
 
