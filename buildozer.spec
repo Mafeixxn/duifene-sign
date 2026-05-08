@@ -5,7 +5,7 @@ package.domain = org.example
 source.dir = .
 source.include_exts = py,png,jpg,kv,atlas,txt
 version = 1.0
-requirements = python3,kivy==2.2.1,requests,beautifulsoup4,soupsieve,certifi,urllib3
+requirements = python3,kivy==2.2.1
 orientation = portrait
 osx.python_version = 3
 osx.kivy_version = 2.3.0
