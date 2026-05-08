@@ -115,37 +115,19 @@ def _draw_round_rect(widget):
 
 
 def _styled_input(hint, password=False, multiline=False, height=dp(46)):
-    """Styled text input with rounded border."""
-    inp = TextInput(
+    """Styled text input — simple flat style, no canvas to avoid GPU state leak."""
+    return TextInput(
         hint_text=hint, multiline=multiline,
         password=password,
         font_size=F_BODY,
         size_hint_y=None, height=height,
-        background_color=(1, 1, 1, 1),
-        foreground_color=C_TEXT,
+        background_color=(0.96, 0.96, 0.97, 1),
+        foreground_color=(0, 0, 0, 1),
         hint_text_color=C_HINT,
         cursor_color=C1,
         padding=[dp(12), dp(10), dp(12), dp(10)],
+        cursor_width=dp(1.5),
     )
-    # rounded border
-    inp.bind(pos=lambda i, _: _draw_input_bg(i), size=lambda i, _: _draw_input_bg(i))
-    return inp
-
-
-def _draw_input_bg(widget):
-    widget.canvas.before.clear()
-    with widget.canvas.before:
-        Color(*C_BORDER)
-        RoundedRectangle(pos=widget.pos, size=widget.size, radius=[dp(8)])
-    # inner white fill
-    m = dp(1.5)
-    with widget.canvas.before:
-        Color(1, 1, 1, 1)
-        RoundedRectangle(
-            pos=(widget.pos[0] + m, widget.pos[1] + m),
-            size=(widget.size[0] - 2 * m, widget.size[1] - 2 * m),
-            radius=[dp(7)],
-        )
 
 
 def _card(inner, padding=dp(12)):
@@ -282,11 +264,9 @@ class SignPanel(BoxLayout):
         self._spinner = Spinner(
             text="请先登录", font_size=F_BODY,
             size_hint_x=0.55, background_normal="", background_down="",
-            background_color=C_CARD, color=C_TEXT,
+            background_color=C_CARD, color=(0, 0, 0, 1),
         )
         self._spinner.bind(text=self._on_course_select)
-        self._spinner.bind(pos=lambda i, _: _draw_round_rect(i),
-                          size=lambda i, _: _draw_round_rect(i))
         row1.add_widget(self._spinner)
 
         row1.add_widget(Label(
@@ -296,12 +276,11 @@ class SignPanel(BoxLayout):
         self._cd_input = TextInput(
             text="10", multiline=False, font_size=F_BODY,
             size_hint_x=0.15, input_filter="int",
-            background_color=C_CARD, foreground_color=C_TEXT,
+            background_color=(0.96, 0.96, 0.97, 1),
+            foreground_color=(0, 0, 0, 1),
             cursor_color=C1, padding=[dp(24), dp(10), 0, dp(10)],
-            halign="center",
+            halign="center", cursor_width=dp(1.5),
         )
-        self._cd_input.bind(pos=lambda i, _: _draw_round_rect(i),
-                           size=lambda i, _: _draw_round_rect(i))
         row1.add_widget(self._cd_input)
         box.add_widget(row1)
 
