@@ -1,6 +1,7 @@
 <p align="center">
   <h1 align="center">对分易自动签到</h1>
   <p align="center">自动监控对分易教学平台签到，支持数字码 / 二维码 / GPS 三种签到类型。</p>
+  <p align="center"><sub>🤖 本项目全程以 AI 辅助开发</sub></p>
 </p>
 
 <p align="center">
