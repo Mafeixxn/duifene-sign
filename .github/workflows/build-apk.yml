@@ -35,7 +35,7 @@ jobs:
       - name: Build APK
         env:
           BUILDOZER_ALLOW_ROOT: "1"
-        run: buildozer --verbose android debug
+        run: cd android && buildozer --verbose android debug
 
       - name: Upload APK
         if: always()

@@ -1,0 +1,2 @@
+将连接复制发送到文件传输助手,点击打开,右上角三点,复制连接
+https://open.weixin.qq.com/connect/oauth2/authorize?appid=wx1b5650884f657981&redirect_uri=https%3A%2F%2Fwww.duifene.com%2F_FileManage%2FPdfView.aspx&response_type=code&scope=snsapi_base&state=1#wechat_redirect

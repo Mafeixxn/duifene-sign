@@ -1,3 +1,5 @@
 __pycache__/
 *.pyc
-*.ini
+*.log
+# Ignore .ini config at root (user credentials)
+/*.ini
