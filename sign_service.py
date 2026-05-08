@@ -82,9 +82,9 @@ class SignService:
         self._heartbeat = 0
 
         checkin_id = activity["checkin_id"]
-        class_id_list = activity["class_id_list"]
+        class_ids = activity["class_ids"]
 
-        if self._class_id not in class_id_list:
+        if self._class_id not in class_ids:
             return
 
         if checkin_id in self._checked_ids:

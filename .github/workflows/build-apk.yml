@@ -30,9 +30,11 @@ jobs:
             python3-pip
 
       - name: Install buildozer and cython
-        run: pip install buildozer cython
+        run: pip install buildozer "cython==0.29.36"
 
       - name: Build APK
+        env:
+          BUILDOZER_ALLOW_ROOT: "1"
         run: buildozer --verbose android debug
 
       - name: Upload APK

@@ -137,10 +137,13 @@ class ApiClient:
             el = soup.find(id=elm_id)
             return el.get("value", "") if el else ""
 
+        raw_ids = val("HFClassID")
+        class_ids = [x.strip() for x in raw_ids.split(",") if x.strip()] if raw_ids else []
+
         activity = {
             "type": val("HFChecktype"),
             "checkin_id": val("HFCheckInID"),
-            "class_id_list": val("HFClassID"),
+            "class_ids": class_ids,
             "seconds": val("HFSeconds"),
             "code": val("HFCheckCodeKey"),
             "longitude": val("HFRoomLongitude"),
