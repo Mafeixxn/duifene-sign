@@ -1,6 +1,50 @@
 """对分易自动签到 — Android APK 版"""
 
+import sys
+import traceback
 import os
+
+_CRASH_LOG = "crash.log"
+_excepthook_installed = False
+
+
+def _install_crash_handler():
+    global _excepthook_installed
+    if _excepthook_installed:
+        return
+    _excepthook_installed = True
+    _orig = sys.excepthook
+
+    def _handler(exc_type, exc_value, exc_tb):
+        tb_str = "".join(traceback.format_exception(exc_type, exc_value, exc_tb))
+        try:
+            with open(_CRASH_LOG, "w") as f:
+                f.write(tb_str)
+        except Exception:
+            pass
+        try:
+            from kivy.uix.popup import Popup
+            from kivy.uix.label import Label
+            from kivy.app import App
+            app = App.get_running_app()
+            if app is not None:
+                popup = Popup(
+                    title="应用崩溃",
+                    content=Label(text=tb_str[:800], font_size=11),
+                    size_hint=(0.95, 0.8),
+                    auto_dismiss=False,
+                )
+                popup.open()
+                return
+        except Exception:
+            pass
+        _orig(exc_type, exc_value, exc_tb)
+
+    sys.excepthook = _handler
+
+
+_install_crash_handler()
+
 from kivy.app import App
 from kivy.clock import Clock, mainthread
 from kivy.uix.boxlayout import BoxLayout
