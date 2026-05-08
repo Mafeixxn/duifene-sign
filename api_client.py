@@ -20,28 +20,25 @@ class _AttrParser(HTMLParser):
         self._targets = set(target_ids)
         self._values = {}
         self._texts = {}
-        self._cur = None
-        self._buf = None
+        self._stack = []  # [(eid, tag, buf)]
 
     def handle_starttag(self, tag, attrs):
         attrs = dict(attrs)
         eid = attrs.get("id", "")
         if eid in self._targets:
-            self._cur = eid
-            self._buf = []
+            self._stack.append((eid, tag, []))
             val = attrs.get("value", "")
             if val:
                 self._values[eid] = val
 
     def handle_data(self, data):
-        if self._cur is not None:
-            self._buf.append(data)
+        for _, _, buf in self._stack:
+            buf.append(data)
 
     def handle_endtag(self, tag):
-        if self._cur is not None:
-            self._texts[self._cur] = "".join(self._buf).strip()
-        self._cur = None
-        self._buf = None
+        if self._stack and self._stack[-1][1] == tag:
+            eid, _, buf = self._stack.pop()
+            self._texts[eid] = "".join(buf).strip()
 
     def val(self, eid, default=""):
         return self._values.get(eid, default)
