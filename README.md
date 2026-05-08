@@ -129,6 +129,10 @@ python main.py
 | kivy + buildozer (Android) | 移动端 GUI + 打包 |
 | plyer (Windows) | 桌面通知 |
 
+## 致谢
+
+本项目参考了 [liuzhijie443/duifene_auto_sign](https://github.com/liuzhijie443/duifene_auto_sign) 的实现思路。
+
 ## 免责声明
 
 本项目仅供学习交流使用，请遵守学校相关规定。使用者自行承担一切责任。
