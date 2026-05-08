@@ -1,9 +1,14 @@
 import re
 import random
 import json
+import ssl
 import urllib.request
 import urllib.error
 from html.parser import HTMLParser
+
+import certifi
+
+_SSL_CONTEXT = ssl.create_default_context(cafile=certifi.where())
 
 HOST = "https://www.duifene.com"
 UA = (
@@ -89,7 +94,7 @@ class ApiClient:
         body = data.encode("utf-8") if isinstance(data, str) else data
         req = urllib.request.Request(url, data=body, headers=headers or {})
         try:
-            resp = urllib.request.urlopen(req, timeout=15)
+            resp = urllib.request.urlopen(req, timeout=15, context=_SSL_CONTEXT)
         except urllib.error.HTTPError as e:
             resp = e
         self._merge_cookies(resp)
