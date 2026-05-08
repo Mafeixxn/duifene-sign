@@ -4,6 +4,7 @@ import json
 import ssl
 import urllib.request
 import urllib.error
+import http.cookiejar
 from html.parser import HTMLParser
 
 import certifi
@@ -58,7 +59,12 @@ class _AttrParser(HTMLParser):
 
 class ApiClient:
     def __init__(self, cookie_str: str = ""):
-        self._ck = {}
+        self._cj = http.cookiejar.CookieJar()
+        self._opener = urllib.request.build_opener(
+            urllib.request.HTTPCookieProcessor(self._cj),
+            urllib.request.HTTPSHandler(context=_SSL_CONTEXT),
+        )
+        self._opener.addheaders = [("User-Agent", UA)]
         if cookie_str:
             self._load_cookie(cookie_str)
 
@@ -68,46 +74,42 @@ class ApiClient:
         for pair in raw.split("; "):
             if "=" in pair:
                 k, v = pair.split("=", 1)
-                self._ck[k] = v
+                ck = http.cookiejar.Cookie(
+                    version=0, name=k, value=v,
+                    port=None, port_specified=False,
+                    domain=".duifene.com", domain_specified=True,
+                    domain_initial_dot=True,
+                    path="/", path_specified=True,
+                    secure=False, expires=None, discard=False,
+                    comment=None, comment_url=None, rest={}, rfc2109=False,
+                )
+                self._cj.set_cookie(ck)
 
     def export_cookie(self) -> str:
-        return "; ".join(f"{k}={v}" for k, v in self._ck.items())
-
-    def _merge_cookies(self, resp):
-        for hdr in resp.headers.get_all("Set-Cookie") or []:
-            part = hdr.split(";")[0].strip()
-            if "=" in part:
-                k, v = part.split("=", 1)
-                self._ck[k] = v
+        return "; ".join(f"{c.name}={c.value}" for c in self._cj)
 
     # ─── HTTP ───
 
-    def _build_headers(self, extra=None):
-        h = {}
-        if self._ck:
-            h["Cookie"] = "; ".join(f"{k}={v}" for k, v in self._ck.items())
-        if extra:
-            h.update(extra)
-        return h
-
-    def _send(self, url, data=None, headers=None):
+    def _send(self, url, data=None, extra_headers=None):
+        headers = {}
+        if extra_headers:
+            headers.update(extra_headers)
         body = data.encode("utf-8") if isinstance(data, str) else data
-        req = urllib.request.Request(url, data=body, headers=headers or {})
+        req = urllib.request.Request(url, data=body, headers=headers)
         try:
-            resp = urllib.request.urlopen(req, timeout=15, context=_SSL_CONTEXT)
+            resp = self._opener.open(req, timeout=15)
         except urllib.error.HTTPError as e:
             resp = e
-        self._merge_cookies(resp)
         return resp
 
     def _post(self, url, data="", extra_headers=None):
-        h = self._build_headers(extra_headers)
-        h.setdefault("Content-Type",
-                     "application/x-www-form-urlencoded; charset=UTF-8")
-        return self._send(url, data=data, headers=h)
+        h = {"Content-Type": "application/x-www-form-urlencoded; charset=UTF-8"}
+        if extra_headers:
+            h.update(extra_headers)
+        return self._send(url, data=data, extra_headers=h)
 
     def _get(self, url, extra_headers=None):
-        return self._send(url, headers=self._build_headers(extra_headers))
+        return self._send(url, extra_headers=extra_headers)
 
     def _read(self, resp):
         charset = "utf-8"
@@ -126,11 +128,11 @@ class ApiClient:
     # ─── 登录 ───
 
     def login_by_password(self, username: str, password: str) -> str:
-        self._ck.clear()
+        self._cj.clear()
         self._get(HOST)
         data = f"action=loginmb&loginname={username}&password={password}"
-        headers = {"Referer": f"{HOST}/AppGate.aspx"}
-        r = self._post(f"{HOST}/AppCode/LoginInfo.ashx", data, headers)
+        r = self._post(f"{HOST}/AppCode/LoginInfo.ashx", data,
+                       {"Referer": f"{HOST}/AppGate.aspx"})
         if r.getcode() == 200:
             return self._safe_json(r).get("msgbox", "未知错误")
         raise ConnectionError(f"登录失败，状态码: {r.getcode()}")
@@ -139,7 +141,7 @@ class ApiClient:
         code_match = re.search(r"(?<=code=)\S{32}", link)
         if not code_match:
             return "链接无效，未找到授权码"
-        self._ck.clear()
+        self._cj.clear()
         r = self._get(f"{HOST}/P.aspx?authtype=1&code={code_match[0]}&state=1")
         if r.getcode() == 200:
             return "微信链接登录成功"
