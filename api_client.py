@@ -206,10 +206,12 @@ class ApiClient:
     def do_qrcode_signin(self, state: str) -> str:
         r = self._get(f"{HOST}/_CheckIn/MB/QrCodeCheckOK.aspx?state={state}")
         if r.status_code == 200:
+            if "签到成功" in r.text:
+                return "签到成功！"
             p = self._parse_html(r.text, "DivOK")
             text = p.text("DivOK")
             if text:
-                return "签到成功！" if "签到成功" in text else text
+                return text
             return "非微信链接登录，二维码无法签到"
         return f"二维码签到失败，状态码: {r.status_code}"
 
