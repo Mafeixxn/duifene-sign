@@ -3,9 +3,9 @@ title = 对分易签到
 package.name = duifene_sign
 package.domain = org.example
 source.dir = .
-source.include_exts = py,png,jpg,kv,atlas,txt
-version = 1.0
-requirements = python3,kivy==2.2.1,requests
+source.include_exts = py,png,jpg,kv,atlas,txt,ttf,json
+version = 1.1
+requirements = python3,kivy==2.1.0,kivymd==1.1.1,requests,pillow
 orientation = portrait
 osx.python_version = 3
 osx.kivy_version = 2.3.0
