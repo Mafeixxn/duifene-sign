@@ -1,5 +1,28 @@
+# Python
 __pycache__/
-*.pyc
-*.log
-# Ignore .ini config at root (user credentials)
+*.py[cod]
+*.egg-info/
+dist/
+build/
+*.whl
+
+# Virtual environments
+venv/
+.venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.sublime-*
+
+# OS
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Project — sensitive/user data
 /*.ini
+cookie.txt
+*.log
+crash.log
