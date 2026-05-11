@@ -6,16 +6,47 @@ on:
       - 'v*'
 
 jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          cd windows
+          pip install -r requirements.txt
+          pip install pyinstaller
+
+      - name: Build exe
+        run: |
+          cd windows
+          pyinstaller --onefile --windowed --name "对分易自动签到" --hidden-import lxml --hidden-import plyer "对分易签到.pyw"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-exe
+          path: windows/dist/对分易自动签到.exe
+
   release:
+    needs: build-windows
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Create Release
-        uses: softprops/action-gh-release@v2
+      - uses: actions/download-artifact@v4
         with:
-          files: android/duifene_sign.apk
+          name: windows-exe
+          path: windows-exe
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            android/duifene_sign.apk
+            windows-exe/对分易自动签到.exe
           generate_release_notes: true
