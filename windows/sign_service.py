@@ -1,5 +1,6 @@
 import threading
 from datetime import datetime
+import requests
 from api_client import ApiClient
 
 
@@ -13,6 +14,8 @@ class SignService:
         self._countdown = 10
         self._checked_ids: set[str] = set()
         self._request_in_flight = False
+        self._next_poll_delay = 1000
+        self._network_error_count = 0
         self._post_ui = None
         # 回调: (level, message)   level: "info" | "success" | "error" | "warn"
         self.callback = None
@@ -36,6 +39,8 @@ class SignService:
         self._checked_ids.clear()
         self._heartbeat = 0
         self._request_in_flight = False
+        self._next_poll_delay = 1000
+        self._network_error_count = 0
         self._monitoring = True
         self._root = root
         self._post_ui = post_ui or self._after_ui
@@ -91,6 +96,18 @@ class SignService:
     def _tick_worker(self):
         try:
             self._tick()
+            self._network_error_count = 0
+            self._next_poll_delay = 1000
+        except requests.Timeout:
+            self._network_error_count += 1
+            self._next_poll_delay = 5000
+            if self._network_error_count == 1 or self._network_error_count % 6 == 0:
+                self._log("warn", "网络响应超时，稍后继续重试")
+        except requests.RequestException as e:
+            self._network_error_count += 1
+            self._next_poll_delay = 5000
+            if self._network_error_count == 1 or self._network_error_count % 6 == 0:
+                self._log("warn", f"网络请求异常，稍后继续重试: {e}")
         except Exception as e:
             self._log("error", f"轮询异常: {e}")
         finally:
@@ -100,7 +117,7 @@ class SignService:
     def _finish_tick(self):
         self._request_in_flight = False
         if self._monitoring:
-            self._after_id = self._root.after(1000, self._poll)
+            self._after_id = self._root.after(self._next_poll_delay, self._poll)
 
     def _tick(self):
         if not self._monitoring:
