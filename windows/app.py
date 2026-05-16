@@ -199,7 +199,7 @@ class App:
 
     def _try_restore_session(self):
         saved = self.config.load_cookie()
-        if not saved or len(saved) <= 1:
+        if not saved:
             return
         try:
             courses = self.api.get_course_list()

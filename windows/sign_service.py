@@ -79,12 +79,12 @@ class SignService:
         self._heartbeat = 0
 
         checkin_id = activity["checkin_id"]
-        class_id_list = activity["class_id_list"]
+        class_ids = activity["class_ids"]
 
-        if self._class_id not in class_id_list:
+        if self._class_id not in class_ids:
             type_names = {"1": "签到码", "2": "二维码", "3": "定位"}
             tname = type_names.get(activity["type"], "未知")
-            self._log("info", f"检测到{tname}签到，但不是本班 (本班ID:{self._class_id}, 活动班级:{class_id_list})")
+            self._log("info", f"检测到{tname}签到，但不是本班 (本班ID:{self._class_id}, 活动班级:{','.join(class_ids)})")
             return
 
         if checkin_id in self._checked_ids:

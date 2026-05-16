@@ -116,11 +116,10 @@ class ApiClient:
             "Referer": f"{HOST}/_UserCenter/PC/CenterStudent.aspx",
             "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
         }
-        r = self.session.get(
+        r = self._post(
             f"{HOST}/AppCode/LoginInfo.ashx",
-            data="Action=checklogin",
-            headers=headers,
-            timeout=15,
+            "Action=checklogin",
+            headers,
         )
         return r.status_code == 200 and self._safe_json(r).get("msg") == "1"
 

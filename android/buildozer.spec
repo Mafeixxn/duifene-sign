@@ -4,7 +4,7 @@ package.name = duifene_sign
 package.domain = org.example
 source.dir = .
 source.include_exts = py,png,jpg,kv,atlas,txt
-version = 1.0
+version = 1.1
 requirements = python3,kivy==2.2.1,requests
 orientation = portrait
 osx.python_version = 3

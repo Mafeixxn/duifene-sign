@@ -20,8 +20,8 @@ class ApiClient:
         self.session.timeout = 15
 
         saved = config.load_cookie()
-        if saved:
-            self.session.cookies.update(saved)
+        for key, value in saved.items():
+            self.session.cookies.set(key, value)
 
     def _post(self, url: str, data: str = "", extra_headers: dict = None) -> requests.Response:
         headers = {
@@ -76,11 +76,10 @@ class ApiClient:
             "Referer": f"{HOST}/_UserCenter/PC/CenterStudent.aspx",
             "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
         }
-        r = self.session.get(
+        r = self._post(
             f"{HOST}/AppCode/LoginInfo.ashx",
-            data="Action=checklogin",
-            headers=headers,
-            timeout=15,
+            "Action=checklogin",
+            headers,
         )
         return r.status_code == 200 and self._safe_json(r).get("msg") == "1"
 
@@ -142,10 +141,13 @@ class ApiClient:
             el = soup.find(id=elm_id)
             return el.get("value", "") if el else ""
 
+        raw_ids = val("HFClassID")
+        class_ids = [x.strip() for x in raw_ids.split(",") if x.strip()] if raw_ids else []
+
         activity = {
             "type": val("HFChecktype"),       # 1=数字 2=二维码 3=定位
             "checkin_id": val("HFCheckInID"),
-            "class_id_list": val("HFClassID"),
+            "class_ids": class_ids,
             "seconds": val("HFSeconds"),
             "code": val("HFCheckCodeKey"),
             "longitude": val("HFRoomLongitude"),
