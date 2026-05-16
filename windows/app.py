@@ -1,4 +1,6 @@
+import queue
 import re
+import threading
 import tkinter as tk
 from tkinter import ttk, messagebox, scrolledtext
 from datetime import datetime
@@ -14,18 +16,23 @@ class App:
         self.api = ApiClient(self.config)
         self.service = SignService(self.api)
         self.service.callback = self._on_service_message
+        self.service.state_callback = self._on_service_state
 
         self._root = tk.Tk()
         self._root.title("对分易自动签到")
         self._root.resizable(False, False)
         self._root.geometry("700x580")
 
+        self._ui_queue = queue.Queue()
+        self._login_in_flight = False
+        self._restore_in_flight = False
+        self._monitor_starting = False
         self._course_list: list[dict] = []
+        self._selected_course = None
         self._monitoring = False
         self._build_ui()
-
-        # 尝试恢复登录
-        self._try_restore_session()
+        self._root.after(100, self._drain_ui_queue)
+        self._root.after(0, self._try_restore_session)
 
     # ─── UI 构建 ───
 
@@ -98,8 +105,9 @@ class App:
                                font=("Microsoft YaHei UI", 10))
         link_entry.pack(fill=tk.X, padx=20, pady=(0, 10))
 
-        ttk.Button(f, text="微信链接登录",
-                   command=self._do_link_login).pack()
+        self._btn_link_login = ttk.Button(f, text="微信链接登录",
+                                          command=self._do_link_login)
+        self._btn_link_login.pack()
 
     def _build_pwd_tab(self):
         f = ttk.Frame(self._tab_pwd)
@@ -127,8 +135,45 @@ class App:
                   font=("Microsoft YaHei UI", 8),
                   foreground="#888").pack(pady=(10, 5))
 
-        ttk.Button(f, text="账号登录",
-                   command=self._do_pwd_login).pack(pady=(0, 10))
+        self._btn_pwd_login = ttk.Button(f, text="账号登录",
+                                         command=self._do_pwd_login)
+        self._btn_pwd_login.pack(pady=(0, 10))
+
+    # ─── 线程与 UI 调度 ───
+
+    def _post_ui(self, func, *args, **kwargs):
+        self._ui_queue.put((func, args, kwargs))
+
+    def _drain_ui_queue(self):
+        while True:
+            try:
+                func, args, kwargs = self._ui_queue.get_nowait()
+            except queue.Empty:
+                break
+            try:
+                func(*args, **kwargs)
+            except Exception as e:
+                self._append_log(f"界面更新异常: {e}", "error")
+        self._root.after(100, self._drain_ui_queue)
+
+    def _run_bg(self, worker):
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _refresh_controls(self):
+        login_state = tk.DISABLED if self._login_in_flight or self._restore_in_flight or self._monitoring or self._monitor_starting else tk.NORMAL
+        if hasattr(self, "_btn_link_login"):
+            self._btn_link_login.configure(state=login_state)
+        if hasattr(self, "_btn_pwd_login"):
+            self._btn_pwd_login.configure(state=login_state)
+        if hasattr(self, "_btn_toggle"):
+            toggle_state = tk.DISABLED if self._login_in_flight or self._restore_in_flight else tk.NORMAL
+            self._btn_toggle.configure(state=toggle_state)
+
+    def _set_login_busy(self, busy: bool):
+        self._login_in_flight = busy
+        if busy:
+            self._status_var.set("登录中，请稍候...")
+        self._refresh_controls()
 
     # ─── 事件处理 ───
 
@@ -150,69 +195,164 @@ class App:
         )
 
     def _do_link_login(self):
+        if self._login_in_flight or self._restore_in_flight:
+            return
+        if self._monitoring or self._monitor_starting:
+            messagebox.showwarning("提示", "请先停止监听再重新登录")
+            return
         link = self._link_var.get().strip()
         if not link or "code=" not in link:
             messagebox.showerror("错误", "请输入包含 code 参数的微信链接")
             return
-        try:
-            msg = self.api.login_by_wechat_link(link)
-            if "成功" in msg:
-                self._append_log(f"{msg}\n", "success")
-                self._load_courses()
-            else:
-                self._append_log(f"登录失败: {msg}\n", "error")
-        except Exception as e:
-            messagebox.showerror("登录失败", str(e))
+
+        self._set_login_busy(True)
+
+        def worker():
+            msg = None
+            courses = None
+            error = None
+            stage = "login"
+            try:
+                msg = self.api.login_by_wechat_link(link)
+                if "成功" in msg:
+                    stage = "course"
+                    courses = self.api.get_course_list()
+            except Exception as e:
+                error = e
+            self._post_ui(self._finish_login, "link", msg, courses, error, stage)
+
+        self._run_bg(worker)
 
     def _do_pwd_login(self):
+        if self._login_in_flight or self._restore_in_flight:
+            return
+        if self._monitoring or self._monitor_starting:
+            messagebox.showwarning("提示", "请先停止监听再重新登录")
+            return
         user = self._user_var.get().strip()
         pwd = self._pwd_var.get().strip()
         if not user or not pwd:
             messagebox.showerror("错误", "请输入账号和密码")
             return
-        try:
-            msg = self.api.login_by_password(user, pwd)
-            self._append_log(f"{msg}\n", "success" if "成功" in msg else "error")
-            if "成功" in msg:
-                self._load_courses()
-        except Exception as e:
-            messagebox.showerror("登录失败", str(e))
+
+        self._set_login_busy(True)
+
+        def worker():
+            msg = None
+            courses = None
+            error = None
+            stage = "login"
+            try:
+                msg = self.api.login_by_password(user, pwd)
+                if "成功" in msg:
+                    stage = "course"
+                    courses = self.api.get_course_list()
+            except Exception as e:
+                error = e
+            self._post_ui(self._finish_login, "pwd", msg, courses, error, stage)
+
+        self._run_bg(worker)
+
+    def _finish_login(self, login_type: str, msg: str | None,
+                      courses: list[dict] | None, error: Exception | None,
+                      stage: str):
+        self._set_login_busy(False)
+        if error:
+            if msg and "成功" in msg:
+                self._append_log(f"{msg}\n", "success")
+            if isinstance(error, PermissionError):
+                self._append_log(f"会话过期: {error}\n", "warn")
+                messagebox.showwarning("登录状态失效", str(error))
+            else:
+                title = "获取课程失败" if stage == "course" else "登录失败"
+                messagebox.showerror(title, str(error))
+            self._status_var.set("就绪")
+            return
+
+        if not msg:
+            self._status_var.set("就绪")
+            return
+
+        if "成功" in msg:
+            self._append_log(f"{msg}\n", "success")
+            self._finish_load_courses(courses, restored=False)
+        else:
+            if login_type == "link":
+                self._append_log(f"登录失败: {msg}\n", "error")
+            else:
+                self._append_log(f"{msg}\n", "error")
+            self._status_var.set("就绪")
 
     def _load_courses(self):
-        try:
-            courses = self.api.get_course_list()
-            if not courses:
+        self._status_var.set("正在获取课程...")
+
+        def worker():
+            courses = None
+            error = None
+            try:
+                courses = self.api.get_course_list()
+            except Exception as e:
+                error = e
+            self._post_ui(self._finish_courses, courses, error)
+
+        self._run_bg(worker)
+
+    def _finish_courses(self, courses: list[dict] | None, error: Exception | None):
+        if error:
+            if isinstance(error, PermissionError):
+                self._append_log(f"会话过期: {error}\n", "warn")
+                messagebox.showwarning("登录状态失效", str(error))
+            else:
+                messagebox.showerror("获取课程失败", str(error))
+            self._status_var.set("就绪")
+            return
+        self._finish_load_courses(courses, restored=False)
+
+    def _finish_load_courses(self, courses: list[dict] | None, restored: bool):
+        if not courses:
+            if not restored:
                 messagebox.showwarning("提示", "未获取到课程列表")
-                return
-            self._course_list = courses
-            names = [c["CourseName"] for c in courses]
-            self._combo["values"] = tuple(names)
-            self._combo.set(names[0])
-            self._on_course_select(None)
+            self._status_var.set("就绪")
+            return
+        self._course_list = courses
+        names = [c["CourseName"] for c in courses]
+        self._combo["values"] = tuple(names)
+        self._combo.set(names[0])
+        self._on_course_select(None)
+        if restored:
+            self._status_var.set("已恢复登录会话")
+            self._append_log("已恢复上次登录会话\n", "info")
+        else:
             self._status_var.set("登录成功 — 请选择课程并开始监听")
             messagebox.showinfo("提示", "登录成功")
-        except PermissionError as e:
-            self._append_log(f"会话过期: {e}\n", "warn")
-            messagebox.showwarning("登录状态失效", str(e))
-        except Exception as e:
-            messagebox.showerror("获取课程失败", str(e))
 
     def _try_restore_session(self):
         saved = self.config.load_cookie()
         if not saved:
             return
-        try:
-            courses = self.api.get_course_list()
-            if courses:
-                self._course_list = courses
-                names = [c["CourseName"] for c in courses]
-                self._combo["values"] = tuple(names)
-                self._combo.set(names[0])
-                self._on_course_select(None)
-                self._status_var.set("已恢复登录会话")
-                self._append_log("已恢复上次登录会话\n", "info")
-        except Exception:
-            self.api.clear_session()
+        self._restore_in_flight = True
+        self._status_var.set("正在恢复登录会话...")
+        self._refresh_controls()
+
+        def worker():
+            courses = None
+            error = None
+            try:
+                courses = self.api.get_course_list()
+            except Exception as e:
+                error = e
+                self.api.clear_session()
+            self._post_ui(self._finish_restore_session, courses, error)
+
+        self._run_bg(worker)
+
+    def _finish_restore_session(self, courses: list[dict] | None, error: Exception | None):
+        self._restore_in_flight = False
+        self._refresh_controls()
+        if error:
+            self._status_var.set("就绪")
+            return
+        self._finish_load_courses(courses, restored=True)
 
     def _on_course_select(self, event):
         if not self._course_list:
@@ -225,13 +365,15 @@ class App:
         self._selected_course = self._course_list[0]
 
     def _toggle_monitor(self):
-        if self._monitoring:
+        if self._monitoring or self._monitor_starting:
             self._stop_monitor()
         else:
             self._start_monitor()
 
     def _start_monitor(self):
-        if not hasattr(self, "_selected_course") or not self._selected_course:
+        if self._login_in_flight or self._restore_in_flight:
+            return
+        if not self._selected_course:
             messagebox.showerror("错误", "请先登录并选择课程")
             return
 
@@ -248,23 +390,45 @@ class App:
         self._log_text.delete("1.0", tk.END)
         self._log_text.configure(state=tk.DISABLED)
 
+        self._monitor_starting = True
+        self._btn_toggle.configure(text="取消启动")
+        self._status_var.set("正在启动监控...")
+        self._refresh_controls()
+
         self.service.start_monitoring(
             course_id=course["CourseID"],
             class_id=course["TClassID"],
             class_name=course["CourseName"],
             countdown=countdown,
             root=self._root,
+            post_ui=self._post_ui,
         )
-
-        self._monitoring = True
-        self._btn_toggle.configure(text="停止监听")
-        self._status_var.set(f"监控中 — {course['CourseName']}")
 
     def _stop_monitor(self):
         self.service.stop_monitoring()
         self._monitoring = False
+        self._monitor_starting = False
         self._btn_toggle.configure(text="开始监听签到")
         self._status_var.set("监控已停止")
+        self._refresh_controls()
+
+    def _on_service_state(self, state: str):
+        if state == "started":
+            self._monitor_starting = False
+            self._monitoring = True
+            self._btn_toggle.configure(text="停止监听")
+            self._status_var.set(f"监控中 — {self.service.class_name}")
+        elif state == "failed":
+            self._monitor_starting = False
+            self._monitoring = False
+            self._btn_toggle.configure(text="开始监听签到")
+            self._status_var.set("监控启动失败")
+        elif state == "stopped":
+            self._monitor_starting = False
+            self._monitoring = False
+            self._btn_toggle.configure(text="开始监听签到")
+            self._status_var.set("监控已停止")
+        self._refresh_controls()
 
     def _on_service_message(self, level: str, message: str):
         self._append_log(message, level)
