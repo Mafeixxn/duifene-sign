@@ -72,7 +72,7 @@ python main.py
 1. 在电脑端微信中打开下面的链接，可以先发送到文件传输助手：
 
    ```text
-   https://open.weixin.qq.com/connect/oauth2/authorize?appid=wx1b5650884f657981&redirect_uri=https://www.duifene.com/_FileManage/PdfView.aspx&response_type=code&scope=snsapi_base&state=1#wechat_redirect
+   https://open.weixin.qq.com/connect/oauth2/authorize?appid=wx1b5650884f657981&redirect_uri=https%3A%2F%2Fwww.duifene.com%2F_FileManage%2FPdfView.aspx&response_type=code&scope=snsapi_base&state=1#wechat_redirect
    ```
 
 2. 打开后点击右上角菜单，复制当前链接。
