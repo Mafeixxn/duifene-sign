@@ -25,7 +25,7 @@
 | 版本 | 适用平台 | 获取方式 |
 |------|---------|----------|
 | Android APK | Android 7.0+ | 下载 [`android/duifene_sign.apk`](android/duifene_sign.apk) |
-| Windows 桌面版 | Windows 10 / 11 | 克隆仓库后运行源码 |
+| Windows 桌面版 | Windows 10 / 11 | [GitHub Releases](../../releases) 下载 exe，或克隆仓库运行源码 |
 
 ## 功能特性
 
@@ -44,6 +44,8 @@
 | 数字签到码 | 支持 | 支持 | 自动提交签到码 |
 | 二维码签到 | 支持 | 支持 | 仅微信链接登录支持 |
 | GPS 定位签到 | 支持 | 支持 | 自动按老师发布的坐标签到 |
+
+> **注意**：监听签到期间请关闭代理/VPN 软件，否则有概率导致签到请求连接超时，错过签到。
 
 ## Windows 桌面版使用
 
@@ -118,6 +120,7 @@ python main.py
 │   ├── api_client.py     # 对分易 API 封装
 │   ├── sign_service.py   # 签到监控逻辑
 │   ├── buildozer.spec    # Buildozer 打包配置
+│   ├── requirements.txt  # 依赖清单
 │   ├── build_apk.ipynb   # Google Colab 构建脚本
 │   └── duifene_sign.apk  # 预构建 APK 安装包
 ├── windows/              # Windows tkinter 桌面版
@@ -126,22 +129,28 @@ python main.py
 │   ├── api_client.py     # 对分易 API 封装
 │   ├── sign_service.py   # 签到监控逻辑
 │   ├── config_manager.py # 配置存取
-│   └── duifenyi.ini      # 配置文件模板
+│   ├── duifenyi.ini      # 配置文件模板
+│   ├── requirements.txt  # 依赖清单
+│   └── 对分易签到.pyw     # 无控制台启动入口
 ├── LICENSE
 └── README.md
 ```
+
+## 自动构建
+
+推送版本标签（`v*`）后，GitHub Actions 会自动构建 Windows exe 并发布到 [Releases](../../releases)，同时附带预构建的 Android APK。
 
 ## 主要依赖
 
 | 依赖 | 用途 |
 |------|------|
-| requests | HTTP 请求 |
-| beautifulsoup4 | HTML 解析 |
+| requests | HTTP 请求（双平台） |
+| beautifulsoup4 | Windows 版 HTML 解析 |
 | lxml | Windows 版 HTML 解析引擎 |
 | tkinter | Windows 桌面 GUI |
+| plyer | Windows 桌面通知 |
 | kivy | Android 移动端 GUI |
 | buildozer | Android APK 打包 |
-| plyer | Windows 桌面通知 |
 
 ## 致谢
 
