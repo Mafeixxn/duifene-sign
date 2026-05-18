@@ -7,11 +7,13 @@
   <img src="https://img.shields.io/badge/python-3.8+-blue.svg" alt="Python">
   <img src="https://img.shields.io/badge/platform-Windows%20%7C%20Android-lightgrey.svg" alt="Platform">
   <img src="https://img.shields.io/badge/license-MIT-green.svg" alt="License">
+  <img src="https://img.shields.io/github/v/release/Mafeixxn/duifene-sign" alt="Release">
+  <img src="https://img.shields.io/github/stars/Mafeixxn/duifene-sign?style=social" alt="Stars">
 </p>
 
 ---
 
-## 项目简介
+## 📖 项目简介
 
 对分易自动签到是一款用于学习和交流的自动签到工具，提供 Windows 桌面版和 Android 移动版。程序可以登录对分易账号、读取课程列表、监听签到任务，并在老师发布签到后自动完成签到。
 
@@ -20,14 +22,14 @@
 - 微信 OAuth 链接登录：支持数字码、二维码、GPS 三种签到类型。
 - 账号密码登录：支持数字码和 GPS 签到，不支持二维码签到。
 
-## 快速下载
+## 📥 快速下载
 
 | 版本 | 适用平台 | 获取方式 |
 |------|---------|----------|
 | Android APK | Android 7.0+ | 下载 [`android/duifene_sign.apk`](android/duifene_sign.apk) |
 | Windows 桌面版 | Windows 10 / 11 | [GitHub Releases](../../releases) 下载 exe，或克隆仓库运行源码 |
 
-## 功能特性
+## ✨ 功能特性
 
 - 微信链接登录：粘贴微信 OAuth 回调链接即可登录。
 - 账号密码登录：可直接使用对分易账号和密码登录。
@@ -37,7 +39,7 @@
 - 签到通知：Windows 版支持桌面通知提醒签到结果。
 - 多端支持：提供 Windows tkinter 桌面版和 Android Kivy 版。
 
-## 签到类型支持
+## 📋 签到类型支持
 
 | 签到类型 | Windows 版 | Android 版 | 说明 |
 |----------|:----------:|:----------:|------|
@@ -45,9 +47,10 @@
 | 二维码签到 | 支持 | 支持 | 仅微信链接登录支持 |
 | GPS 定位签到 | 支持 | 支持 | 自动按老师发布的坐标签到 |
 
-> **注意**：监听签到期间请关闭代理/VPN 软件，否则有概率导致签到请求连接超时，错过签到。
+> [!WARNING]
+> 监听签到期间请关闭代理/VPN 软件，否则有概率导致签到请求连接超时，错过签到。
 
-## Windows 桌面版使用
+## 🖥️ Windows 桌面版使用
 
 ### 1. 安装依赖
 
@@ -89,7 +92,7 @@ python main.py
 3. 点击「开始监听签到」。
 4. 等待老师发布签到，程序会自动尝试完成签到。
 
-## Android 版使用
+## 📱 Android 版使用
 
 ### 直接安装
 
@@ -112,7 +115,7 @@ pip install -r requirements.txt
 python main.py
 ```
 
-## 目录结构
+## 📁 目录结构
 
 ```text
 ├── android/              # Android Kivy 版
@@ -136,11 +139,11 @@ python main.py
 └── README.md
 ```
 
-## 自动构建
+## 🔧 自动构建
 
 推送版本标签（`v*`）后，GitHub Actions 会自动构建 Windows exe 并发布到 [Releases](../../releases)，同时附带预构建的 Android APK。
 
-## 主要依赖
+## 📦 主要依赖
 
 | 依赖 | 用途 |
 |------|------|
@@ -152,14 +155,14 @@ python main.py
 | kivy | Android 移动端 GUI |
 | buildozer | Android APK 打包 |
 
-## 致谢
+## 🙏 致谢
 
 本项目参考了 [liuzhijie443/duifene_auto_sign](https://github.com/liuzhijie443/duifene_auto_sign) 的实现思路。
 
-## 免责声明
+## ⚠️ 免责声明
 
 本项目仅供学习交流和技术研究使用，请遵守学校、课程和平台的相关规定。因使用本项目产生的任何后果由使用者自行承担。
 
-## License
+## 📄 License
 
-本项目基于 [MIT License](LICENSE) 开源。
+[![MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
