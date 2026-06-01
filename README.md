@@ -98,6 +98,17 @@ python main.py
 
 下载 [`android/duifene_sign.apk`](android/duifene_sign.apk) 并安装到 Android 手机即可。
 
+具体步骤
+
+1.在微信将链接发到聊天里面(或者收藏),然后点开,出现一个PDF文件预览画面(无内容)
+
+2.点开右上角三个点,在浏览器打开
+
+3.然后复制浏览器里面的链接
+
+4.将链接粘贴到本软件的oauth链接输入框,点微信登录
+
+
 ### 自行构建 APK
 
 可以使用 [`android/build_apk.ipynb`](android/build_apk.ipynb) 在 Google Colab 中构建 APK：
