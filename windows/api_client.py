@@ -1,6 +1,11 @@
 import re
 import random
 import requests
+try:
+    import lxml  # noqa: F401
+    BS_PARSER = "lxml"
+except ImportError:
+    BS_PARSER = "html.parser"
 from bs4 import BeautifulSoup
 from config_manager import ConfigManager
 
@@ -104,7 +109,7 @@ class ApiClient:
     def get_student_id(self) -> str:
         r = self._get(f"{HOST}/_UserCenter/MB/index.aspx")
         if r.status_code == 200:
-            soup = BeautifulSoup(r.text, "lxml")
+            soup = BeautifulSoup(r.text, BS_PARSER)
             el = soup.find(id="hidUID")
             if el:
                 return el.get("value", "")
@@ -169,7 +174,7 @@ class ApiClient:
     def do_qrcode_signin(self, state: str) -> str:
         r = self._get(f"{HOST}/_CheckIn/MB/QrCodeCheckOK.aspx?state={state}")
         if r.status_code == 200:
-            soup = BeautifulSoup(r.text, "lxml")
+            soup = BeautifulSoup(r.text, BS_PARSER)
             el = soup.find(id="DivOK")
             if el:
                 text = el.get_text()
