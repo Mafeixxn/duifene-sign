@@ -8,6 +8,7 @@ from datetime import datetime
 from config_manager import ConfigManager
 from api_client import ApiClient
 from sign_service import SignService
+import sv_ttk
 
 
 class App:
@@ -22,6 +23,16 @@ class App:
         self._root.title("对分易自动签到")
         self._root.resizable(False, False)
         self._root.geometry("700x580")
+        self._root.option_add("*Font", ("Microsoft YaHei UI", 9))
+        sv_ttk.set_theme("light")
+
+        style = ttk.Style()
+        style.configure(".", font=("Microsoft YaHei UI", 9))
+        style.configure("TNotebook.Tab", font=("Microsoft YaHei UI", 9), padding=(16, 6))
+        style.configure("TButton", font=("Microsoft YaHei UI", 9), padding=(12, 6))
+        style.configure("TLabel", font=("Microsoft YaHei UI", 9))
+        style.configure("TEntry", font=("Microsoft YaHei UI", 9), padding=(8, 6))
+        style.configure("TCombobox", font=("Microsoft YaHei UI", 9))
 
         self._ui_queue = queue.Queue()
         self._login_in_flight = False
@@ -185,12 +196,15 @@ class App:
     def _show_link_help(self):
         self._append_log(
             "\n微信链接获取方法：\n"
-            "1. 在电脑端微信中，将以下链接发给文件传输助手并打开\n"
+            "1. 在电脑端微信中，将下方链接发给文件传输助手并打开\n\n"
             "   https://open.weixin.qq.com/connect/oauth2/authorize"
-            "?appid=wx1b5650884f657981&redirect_uri="
-            "https://www.duifene.com/_FileManage/PdfView.aspx?...\n"
+            "?appid=wx1b5650884f657981"
+            "&redirect_uri=https%3A%2F%2Fwww.duifene.com"
+            "%2F_FileManage%2FPdfView.aspx"
+            "&response_type=code&scope=snsapi_base"
+            "&state=1#wechat_redirect\n\n"
             "2. 点击右上角 ⋯ → 复制链接\n"
-            "3. 粘贴到左侧输入框，点击登录\n",
+            "3. 粘贴到输入框，点击登录\n",
             "info"
         )
 
