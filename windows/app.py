@@ -20,6 +20,7 @@ class App:
         self.service.state_callback = self._on_service_state
 
         self._root = tk.Tk()
+        self._root.configure(bg="#EEF0F4")
         self._root.title("对分易自动签到")
         self._root.resizable(False, False)
         self._root.geometry("720x600")
@@ -33,6 +34,8 @@ class App:
         style.configure("TLabel", font=("Microsoft YaHei UI", 9))
         style.configure("TEntry", font=("Microsoft YaHei UI", 9), padding=(8, 6))
         style.configure("TCombobox", font=("Microsoft YaHei UI", 9))
+        style.configure("TNotebook", background="#FFFFFF", borderwidth=0)
+        style.configure("TFrame", background="#FFFFFF")
 
         self._ui_queue = queue.Queue()
         self._login_in_flight = False
@@ -49,11 +52,15 @@ class App:
 
     def _build_ui(self):
         # 顶部 notebook（登录区）
-        self._notebook = ttk.Notebook(self._root)
-        self._notebook.pack(fill=tk.X, padx=10, pady=(10, 0))
+        login_card = tk.Frame(self._root, bg="#FFFFFF", highlightbackground="#DDE1E8",
+                             highlightthickness=1, bd=0)
+        login_card.pack(fill=tk.X, padx=12, pady=(12, 0))
 
-        self._tab_link = ttk.Frame(self._notebook)
-        self._tab_pwd = ttk.Frame(self._notebook)
+        self._notebook = ttk.Notebook(login_card)
+        self._notebook.pack(fill=tk.X, padx=2, pady=(2, 2))
+
+        self._tab_link = tk.Frame(self._notebook, bg="#FFFFFF")
+        self._tab_pwd = tk.Frame(self._notebook, bg="#FFFFFF")
         self._notebook.add(self._tab_link, text="微信链接登录")
         self._notebook.add(self._tab_pwd, text="账号密码登录")
         self._notebook.bind("<<NotebookTabChanged>>", self._on_tab_change)
@@ -62,8 +69,12 @@ class App:
         self._build_pwd_tab()
 
         # 中间控制栏
-        ctrl = ttk.Frame(self._root)
-        ctrl.pack(fill=tk.X, padx=12, pady=(12, 0))
+        ctrl_card = tk.Frame(self._root, bg="#FFFFFF", highlightbackground="#DDE1E8",
+                            highlightthickness=1, bd=0)
+        ctrl_card.pack(fill=tk.X, padx=12, pady=(6, 0))
+
+        ctrl = tk.Frame(ctrl_card, bg="#FFFFFF")
+        ctrl.pack(fill=tk.X, padx=10, pady=10)
 
         ttk.Label(ctrl, text="选择课程:").pack(side=tk.LEFT)
         self._combo_var = tk.StringVar()
@@ -82,13 +93,17 @@ class App:
         self._btn_toggle.pack(side=tk.RIGHT, padx=(10, 0))
 
         # 日志区域
-        log_frame = ttk.Frame(self._root)
-        log_frame.pack(fill=tk.BOTH, expand=True, padx=12, pady=(10, 4))
+        log_card = tk.Frame(self._root, bg="#FFFFFF", highlightbackground="#DDE1E8",
+                           highlightthickness=1, bd=0)
+        log_card.pack(fill=tk.BOTH, expand=True, padx=12, pady=(6, 4))
+
+        log_frame = tk.Frame(log_card, bg="#FFFFFF")
+        log_frame.pack(fill=tk.BOTH, expand=True, padx=6, pady=(6, 6))
 
         self._log_text = scrolledtext.ScrolledText(
             log_frame, width=80, height=20,
             font=("Microsoft YaHei UI", 9), state=tk.DISABLED,
-            bg="#FAFBFC", fg="#1F2937",
+            bg="#FFFFFF", fg="#1F2937",
             relief=tk.FLAT, borderwidth=0,
             padx=10, pady=8,
         )
@@ -100,15 +115,20 @@ class App:
 
         # 状态栏
         self._status_var = tk.StringVar(value="就绪")
-        status_bar = ttk.Label(self._root, textvariable=self._status_var,
-                               anchor=tk.W, padding=(10, 4))
+        status_bar = tk.Frame(self._root, bg="#E8EAF0", height=28)
         status_bar.pack(fill=tk.X, side=tk.BOTTOM)
+        status_bar.pack_propagate(False)
+        sb_label = ttk.Label(status_bar, textvariable=self._status_var,
+                            background="#E8EAF0", foreground="#6B7280",
+                            anchor=tk.W, padding=(10, 4),
+                            font=("Microsoft YaHei UI", 8))
+        sb_label.pack(fill=tk.BOTH, expand=True)
 
         # 初始显示链接登录页的说明
         self._show_link_help()
 
     def _build_link_tab(self):
-        f = ttk.Frame(self._tab_link)
+        f = tk.Frame(self._tab_link, bg="#FFFFFF")
         f.pack(fill=tk.X, pady=(15, 8))
 
         ttk.Label(f, text="将微信OAuth链接粘贴到下方，点击登录",
@@ -124,10 +144,10 @@ class App:
         self._btn_link_login.pack()
 
     def _build_pwd_tab(self):
-        f = ttk.Frame(self._tab_pwd)
+        f = tk.Frame(self._tab_pwd, bg="#FFFFFF")
         f.pack(fill=tk.X, pady=(15, 8))
 
-        row1 = ttk.Frame(f)
+        row1 = tk.Frame(f, bg="#FFFFFF")
         row1.pack(fill=tk.X, padx=20, pady=4)
         ttk.Label(row1, text="账号", width=6,
                   font=("Microsoft YaHei UI", 10)).pack(side=tk.LEFT)
@@ -136,7 +156,7 @@ class App:
                   font=("Microsoft YaHei UI", 10)).pack(side=tk.LEFT,
                                                          fill=tk.X, expand=True)
 
-        row2 = ttk.Frame(f)
+        row2 = tk.Frame(f, bg="#FFFFFF")
         row2.pack(fill=tk.X, padx=20, pady=4)
         ttk.Label(row2, text="密码", width=6,
                   font=("Microsoft YaHei UI", 10)).pack(side=tk.LEFT)
