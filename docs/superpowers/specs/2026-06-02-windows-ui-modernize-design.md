@@ -41,7 +41,7 @@ COLORS = {
     "accent":    "#4F6EF7",
     "success":   "#22A861",
     "error":     "#DC143C",
-    "warn":      "#FF8C00",
+    "warn":      "#EB7D00",
 }
 ```
 
@@ -64,7 +64,7 @@ COLORS = {
 
 ## 不改的内容
 
-- 窗口大小 (700x580)、resizable=False
+- resizable=False
 - 所有控件布局、层级结构
 - 所有事件回调、线程模型、UI 队列
 - 日志消息内容（除初始帮助文案的链接修正）
