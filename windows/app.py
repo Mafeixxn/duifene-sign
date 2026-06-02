@@ -22,7 +22,7 @@ class App:
         self._root = tk.Tk()
         self._root.title("对分易自动签到")
         self._root.resizable(False, False)
-        self._root.geometry("700x580")
+        self._root.geometry("720x600")
         self._root.option_add("*Font", ("Microsoft YaHei UI", 9))
         sv_ttk.set_theme("light")
 
@@ -63,7 +63,7 @@ class App:
 
         # 中间控制栏
         ctrl = ttk.Frame(self._root)
-        ctrl.pack(fill=tk.X, padx=10, pady=(10, 0))
+        ctrl.pack(fill=tk.X, padx=12, pady=(12, 0))
 
         ttk.Label(ctrl, text="选择课程:").pack(side=tk.LEFT)
         self._combo_var = tk.StringVar()
@@ -83,22 +83,25 @@ class App:
 
         # 日志区域
         log_frame = ttk.Frame(self._root)
-        log_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=(10, 0))
+        log_frame.pack(fill=tk.BOTH, expand=True, padx=12, pady=(10, 4))
 
         self._log_text = scrolledtext.ScrolledText(
             log_frame, width=80, height=20,
             font=("Microsoft YaHei UI", 9), state=tk.DISABLED,
+            bg="#FAFBFC", fg="#1F2937",
+            relief=tk.FLAT, borderwidth=0,
+            padx=10, pady=8,
         )
         self._log_text.pack(fill=tk.BOTH, expand=True)
-        self._log_text.tag_config("success", foreground="#228B22")
+        self._log_text.tag_config("success", foreground="#22A861")
         self._log_text.tag_config("error", foreground="#DC143C")
-        self._log_text.tag_config("warn", foreground="#FF8C00")
-        self._log_text.tag_config("info", foreground="#1E1E1E")
+        self._log_text.tag_config("warn", foreground="#EB7D00")
+        self._log_text.tag_config("info", foreground="#1F2937")
 
         # 状态栏
         self._status_var = tk.StringVar(value="就绪")
         status_bar = ttk.Label(self._root, textvariable=self._status_var,
-                               relief=tk.SUNKEN, anchor=tk.W, padding=(5, 2))
+                               anchor=tk.W, padding=(10, 4))
         status_bar.pack(fill=tk.X, side=tk.BOTTOM)
 
         # 初始显示链接登录页的说明
@@ -106,7 +109,7 @@ class App:
 
     def _build_link_tab(self):
         f = ttk.Frame(self._tab_link)
-        f.pack(fill=tk.X, pady=(20, 5))
+        f.pack(fill=tk.X, pady=(15, 8))
 
         ttk.Label(f, text="将微信OAuth链接粘贴到下方，点击登录",
                   font=("Microsoft YaHei UI", 9)).pack(pady=(0, 8))
@@ -122,7 +125,7 @@ class App:
 
     def _build_pwd_tab(self):
         f = ttk.Frame(self._tab_pwd)
-        f.pack(fill=tk.X, pady=(20, 5))
+        f.pack(fill=tk.X, pady=(15, 8))
 
         row1 = ttk.Frame(f)
         row1.pack(fill=tk.X, padx=20, pady=4)
