@@ -24,7 +24,7 @@
 
 > [!WARNING]
 > - 监听签到期间请关闭代理/VPN 软件，否则有概率导致签到请求连接超时，错过签到
-> - 使用前自己先创一个课程测试一下,有问题就反馈一下,后续我会改进
+> - 使用前务必先创一个课程测试一下,有问题就反馈一下,后续我可能会改进
 > - 建议链接登录，因为账号密码登录有bug
   
 ## 📥 快速下载
@@ -169,6 +169,17 @@ python main.py
 | plyer | Windows 桌面通知 |
 | kivy | Android 移动端 GUI |
 | buildozer | Android APK 打包 |
+
+## 效果截图
+二维码签到
+<img width="1886" height="816" alt="Snipaste_2026-06-02_12-44-26" src="https://github.com/user-attachments/assets/88b0d6f6-f292-43b4-b80b-7996cc8b24f5" />
+
+定位签到
+<img width="1762" height="1071" alt="Snipaste_2026-06-02_12-40-17" src="https://github.com/user-attachments/assets/c2519d74-142b-4a8e-9b45-1e538590e286" />
+
+签到码签到
+<img width="1742" height="669" alt="Snipaste_2026-06-02_12-42-56" src="https://github.com/user-attachments/assets/8d5019af-ec6b-4b48-b785-6852b5177839" />
+
 
 ## 🙏 致谢
 
