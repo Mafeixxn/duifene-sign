@@ -41,6 +41,7 @@ class SignService:
         self._request_in_flight = False
         self._next_poll_delay = 1000
         self._network_error_count = 0
+        self._start_time = time.time()
         self._monitoring = True
         self._root = root
         self._post_ui = post_ui or self._after_ui
@@ -122,6 +123,21 @@ class SignService:
     def _tick(self):
         if not self._monitoring:
             return
+
+        if time.time() - self._start_time >= 600:
+            self._log("info", "监听已运行10分钟，自动刷新...")
+            try:
+                if self.api.enter_course(self._course_id):
+                    self._start_time = time.time()
+                    self._checked_ids.clear()
+                    self._heartbeat = 0
+                    self._log("info", "自动刷新完成，继续监听")
+                else:
+                    self._log("warn", "自动刷新失败（进入课程失败），继续使用旧会话")
+                    self._start_time = time.time()
+            except Exception as e:
+                self._log("warn", f"自动刷新异常: {e}，继续使用旧会话")
+                self._start_time = time.time()
 
         if not self.api.check_login():
             if self._monitoring:
