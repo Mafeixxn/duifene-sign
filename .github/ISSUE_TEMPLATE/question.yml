@@ -1,0 +1,50 @@
+name: 🐞 问题反馈
+description: 请通过此模板提交问题，以便我们更快定位
+title: "[问题]: "
+labels: ["question"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        感谢您提交问题！为了让我们更直观地了解情况，**请务必提供相关截图并告知系统版本**。
+
+  - type: dropdown
+    id: platform
+    attributes:
+      label: 系统平台
+      description: 请选择您遇到问题的设备平台
+      options:
+        - Windows
+        - Android
+        - macOS
+        - iOS
+        - 其他
+    validations:
+      required: false  # 设置为 false，表示不强制要求选择
+
+  - type: textarea
+    id: description
+    attributes:
+      label: 问题描述
+      description: 请详细描述您遇到的问题或疑问。
+      placeholder: 比如：点击某按钮后没有反应...
+    validations:
+      required: true
+
+  - type: textarea
+    id: screenshot
+    attributes:
+      label: 截图
+      description: 请上传能说明问题的截图（直接拖拽图片到此处即可上传）。
+      placeholder: 拖放图片或粘贴截图到这里...
+    validations:
+      required: false  # 这里保持 false，表示截图也不强制要求
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: 相关日志或代码
+      description: 如果有报错信息，请粘贴在这里。
+      render: shell
+    validations:
+      required: false
