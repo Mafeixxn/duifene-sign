@@ -43,6 +43,7 @@ class App:
         self._monitor_starting = False
         self._course_list: list[dict] = []
         self._selected_course = None
+        self._course_by_label: dict[str, dict] = {}
         self._monitoring = False
         self._build_ui()
         self._root.after(100, self._drain_ui_queue)
@@ -352,7 +353,8 @@ class App:
             self._status_var.set("就绪")
             return
         self._course_list = courses
-        names = [c["CourseName"] for c in courses]
+        names = self._build_course_labels(courses)
+        self._course_by_label = dict(zip(names, courses))
         self._combo["values"] = tuple(names)
         self._combo.set(names[0])
         self._on_course_select(None)
@@ -395,17 +397,37 @@ class App:
         if not self._course_list:
             return
         name = self._combo_var.get()
-        for c in self._course_list:
-            if c["CourseName"] == name:
-                self._selected_course = c
-                return
-        self._selected_course = self._course_list[0]
+        self._selected_course = self._course_by_label.get(name, self._course_list[0])
 
     def _toggle_monitor(self):
         if self._monitoring or self._monitor_starting:
             self._stop_monitor()
         else:
             self._start_monitor()
+
+    @staticmethod
+    def _parse_countdown(value: str) -> int:
+        seconds = int(value.strip())
+        if seconds < 0:
+            raise ValueError("countdown must be non-negative")
+        return seconds
+
+    @staticmethod
+    def _build_course_labels(courses: list[dict]) -> list[str]:
+        counts = {}
+        for course in courses:
+            name = course.get("CourseName", "未命名课程")
+            counts[name] = counts.get(name, 0) + 1
+
+        labels = []
+        for course in courses:
+            name = course.get("CourseName", "未命名课程")
+            if counts[name] > 1:
+                suffix = course.get("TClassID") or course.get("CourseID") or str(len(labels) + 1)
+                labels.append(f"{name} ({suffix})")
+            else:
+                labels.append(name)
+        return labels
 
     def _start_monitor(self):
         if self._login_in_flight or self._restore_in_flight:
@@ -415,9 +437,9 @@ class App:
             return
 
         try:
-            countdown = int(self._countdown_var.get())
+            countdown = self._parse_countdown(self._countdown_var.get())
         except ValueError:
-            messagebox.showerror("错误", "倒计时秒数请输入整数")
+            messagebox.showerror("错误", "倒计时秒数请输入非负整数")
             return
 
         self.config.save_countdown(countdown)

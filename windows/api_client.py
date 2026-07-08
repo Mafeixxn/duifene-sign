@@ -1,5 +1,7 @@
-import re
 import random
+import re
+from urllib.parse import parse_qs, urlencode, urlparse
+
 import requests
 try:
     import lxml  # noqa: F401
@@ -28,13 +30,13 @@ class ApiClient:
         for key, value in saved.items():
             self.session.cookies.set(key, value)
 
-    def _post(self, url: str, data: str = "", extra_headers: dict = None) -> requests.Response:
+    def _post(self, url: str, data=None, extra_headers: dict = None) -> requests.Response:
         headers = {
             "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
         }
         if extra_headers:
             headers.update(extra_headers)
-        return self.session.post(url, data=data, headers=headers, timeout=15)
+        return self.session.post(url, data=data or "", headers=headers, timeout=15)
 
     def _get(self, url: str, extra_headers: dict = None) -> requests.Response:
         return self.session.get(url, headers=extra_headers, timeout=15)
@@ -51,7 +53,11 @@ class ApiClient:
     def login_by_password(self, username: str, password: str) -> str:
         self.session.cookies.clear()
         self._get(HOST)
-        data = f"action=loginmb&loginname={username}&password={password}"
+        data = {
+            "action": "loginmb",
+            "loginname": username,
+            "password": password,
+        }
         headers = {"Referer": f"{HOST}/AppGate.aspx"}
         r = self._post(f"{HOST}/AppCode/LoginInfo.ashx", data, headers)
         if r.status_code == 200:
@@ -63,16 +69,30 @@ class ApiClient:
         raise ConnectionError(f"登录请求失败，状态码: {r.status_code}")
 
     def login_by_wechat_link(self, link: str) -> str:
-        code_match = re.search(r"(?<=code=)\S{32}", link)
-        if not code_match:
+        code = self._extract_wechat_code(link)
+        if not code:
             return "链接无效，未找到授权码"
-        code = code_match[0]
+
         self.session.cookies.clear()
-        r = self._get(f"{HOST}/P.aspx?authtype=1&code={code}&state=1")
+        query = urlencode({"authtype": "1", "code": code, "state": "1"})
+        r = self._get(f"{HOST}/P.aspx?{query}")
         if r.status_code == 200:
-            self._persist_cookie()
-            return "微信链接登录成功"
+            if self.check_login():
+                self._persist_cookie()
+                return "微信链接登录成功"
+            return "微信链接登录失败，请确认链接未过期"
         raise ConnectionError(f"微信登录请求失败，状态码: {r.status_code}")
+
+    @staticmethod
+    def _extract_wechat_code(link: str) -> str:
+        try:
+            values = parse_qs(urlparse(link).query).get("code", [])
+        except Exception:
+            return ""
+        if len(values) != 1:
+            return ""
+        code = values[0].strip()
+        return code if re.fullmatch(r"[A-Za-z0-9_-]{32}", code) else ""
 
     # ─── 登录状态 ───
 
@@ -83,7 +103,7 @@ class ApiClient:
         }
         r = self._post(
             f"{HOST}/AppCode/LoginInfo.ashx",
-            "Action=checklogin",
+            {"Action": "checklogin"},
             headers,
         )
         return r.status_code == 200 and self._safe_json(r).get("msg") == "1"
@@ -93,7 +113,7 @@ class ApiClient:
     def get_course_list(self) -> list[dict]:
         r = self._post(
             f"{HOST}/_UserCenter/CourseInfo.ashx",
-            "action=getstudentcourse&classtypeid=2",
+            {"action": "getstudentcourse", "classtypeid": "2"},
             {"Referer": f"{HOST}/_UserCenter/PC/CenterStudent.aspx"},
         )
         if r.status_code == 200:
@@ -119,18 +139,23 @@ class ApiClient:
 
     def enter_course(self, course_id: str) -> bool:
         headers = {"Referer": f"{HOST}/_UserCenter/MB/index.aspx"}
-        r = self._get(f"{HOST}/_UserCenter/MB/Module.aspx?data={course_id}",
+        r = self._get(f"{HOST}/_UserCenter/MB/Module.aspx?{urlencode({'data': course_id})}",
                        extra_headers=headers)
         return r.status_code == 200 and course_id in r.text
 
     # ─── 签到活动监控 ───
 
     def check_sign_activity(self, class_id: str) -> dict | None:
-        url = (
-            f"{HOST}/_CheckIn/MB/TeachCheckIn.aspx"
-            f"?classid={class_id}&temps=0&checktype=1&isrefresh=0"
-            f"&timeinterval=0&roomid=0&match="
-        )
+        query = urlencode({
+            "classid": class_id,
+            "temps": "0",
+            "checktype": "1",
+            "isrefresh": "0",
+            "timeinterval": "0",
+            "roomid": "0",
+            "match": "",
+        })
+        url = f"{HOST}/_CheckIn/MB/TeachCheckIn.aspx?{query}"
         r = self._get(url)
         if r.status_code != 200:
             return None
@@ -140,7 +165,7 @@ class ApiClient:
             # 有签到活动时才会出现 HFChecktype，没有活动时这里返回 None 是正常的
             return None
 
-        soup = BeautifulSoup(text, "lxml")
+        soup = BeautifulSoup(text, BS_PARSER)
 
         def val(elm_id: str) -> str:
             el = soup.find(id=elm_id)
@@ -164,7 +189,11 @@ class ApiClient:
 
     def do_code_signin(self, checkin_code: str) -> str:
         sid = self.get_student_id()
-        data = f"action=studentcheckin&studentid={sid}&checkincode={checkin_code}"
+        data = {
+            "action": "studentcheckin",
+            "studentid": sid,
+            "checkincode": checkin_code,
+        }
         headers = {"Referer": f"{HOST}/_CheckIn/MB/CheckInStudent.aspx?moduleid=16&pasd="}
         r = self._post(f"{HOST}/_CheckIn/CheckIn.ashx", data, headers)
         if r.status_code == 200:
@@ -172,7 +201,7 @@ class ApiClient:
         return f"签到码签到失败，状态码: {r.status_code}"
 
     def do_qrcode_signin(self, state: str) -> str:
-        r = self._get(f"{HOST}/_CheckIn/MB/QrCodeCheckOK.aspx?state={state}")
+        r = self._get(f"{HOST}/_CheckIn/MB/QrCodeCheckOK.aspx?{urlencode({'state': state})}")
         if r.status_code == 200:
             soup = BeautifulSoup(r.text, BS_PARSER)
             el = soup.find(id="DivOK")
@@ -188,7 +217,12 @@ class ApiClient:
         lng = round(float(longitude) + random.uniform(-0.000089, 0.000089), 8)
         lat = round(float(latitude) + random.uniform(-0.000089, 0.000089), 8)
         sid = self.get_student_id()
-        data = f"action=signin&sid={sid}&longitude={lng}&latitude={lat}"
+        data = {
+            "action": "signin",
+            "sid": sid,
+            "longitude": lng,
+            "latitude": lat,
+        }
         headers = {"Referer": f"{HOST}/_CheckIn/MB/CheckInStudent.aspx?moduleid=16&pasd="}
         r = self._post(f"{HOST}/_CheckIn/CheckInRoomHandler.ashx", data, headers)
         if r.status_code == 200:
