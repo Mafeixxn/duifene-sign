@@ -1,4 +1,5 @@
 import threading
+import time
 from datetime import datetime
 import requests
 from api_client import ApiClient
@@ -41,6 +42,7 @@ class SignService:
         self._request_in_flight = False
         self._next_poll_delay = 1000
         self._network_error_count = 0
+        self._start_time = time.time()
         self._monitoring = True
         self._root = root
         self._post_ui = post_ui or self._after_ui
@@ -123,6 +125,21 @@ class SignService:
         if not self._monitoring:
             return
 
+        if time.time() - self._start_time >= 600:
+            self._log("info", "监听已运行10分钟，自动刷新...")
+            try:
+                if self.api.enter_course(self._course_id):
+                    self._start_time = time.time()
+                    self._checked_ids.clear()
+                    self._heartbeat = 0
+                    self._log("info", "自动刷新完成，继续监听")
+                else:
+                    self._log("warn", "自动刷新失败（进入课程失败），继续使用旧会话")
+                    self._start_time = time.time()
+            except Exception as e:
+                self._log("warn", f"自动刷新异常: {e}，继续使用旧会话")
+                self._start_time = time.time()
+
         if not self.api.check_login():
             if self._monitoring:
                 self._log("warn", "登录状态已失效，请重新登录")
@@ -143,20 +160,28 @@ class SignService:
             return
         self._heartbeat = 0
 
-        checkin_id = activity["checkin_id"]
-        class_ids = activity["class_ids"]
+        checkin_id = activity.get("checkin_id", "")
+        class_ids = activity.get("class_ids", [])
+
+        if not checkin_id:
+            self._log("warn", "活动数据不完整: 缺少签到ID")
+            return
 
         if self._class_id not in class_ids:
             type_names = {"1": "签到码", "2": "二维码", "3": "定位"}
-            tname = type_names.get(activity["type"], "未知")
+            tname = type_names.get(activity.get("type", ""), "未知")
             self._log("info", f"检测到{tname}签到，但不是本班 (本班ID:{self._class_id}, 活动班级:{','.join(class_ids)})")
             return
 
         if checkin_id in self._checked_ids:
             return
 
-        check_type = activity["type"]
-        seconds = int(activity["seconds"])
+        check_type = activity.get("type", "")
+        try:
+            seconds = int(activity.get("seconds", ""))
+        except (TypeError, ValueError):
+            self._log("warn", f"活动数据不完整: 签到ID:{checkin_id} 缺少有效倒计时")
+            return
         now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
         if seconds > self._countdown:
@@ -169,15 +194,24 @@ class SignService:
             if not self._monitoring:
                 return
             if check_type == "1":
-                code = activity["code"]
+                code = activity.get("code", "")
+                if not code:
+                    self._log("warn", f"活动数据不完整: 签到ID:{checkin_id} 缺少签到码")
+                    return
                 self._log("info", f"\n{now} 签到ID:{checkin_id} 开始签到码签到\t码:{code}")
                 msg = self.api.do_code_signin(code)
             elif check_type == "2":
                 self._log("info", f"\n{now} 签到ID:{checkin_id} 开始二维码签到")
                 msg = self.api.do_qrcode_signin(checkin_id)
             elif check_type == "3":
-                lng = activity["longitude"]
-                lat = activity["latitude"]
+                lng = activity.get("longitude", "")
+                lat = activity.get("latitude", "")
+                try:
+                    float(lng)
+                    float(lat)
+                except (TypeError, ValueError):
+                    self._log("warn", f"活动数据不完整: 签到ID:{checkin_id} 缺少有效定位")
+                    return
                 self._log("info", f"\n{now} 签到ID:{checkin_id} 开始定位签到")
                 msg = self.api.do_location_signin(lng, lat)
             else:
