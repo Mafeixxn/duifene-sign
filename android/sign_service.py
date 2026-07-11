@@ -82,9 +82,10 @@ class SignService:
             return
 
         entered = self.api.enter_course(self._course_id)
-        self._last_course_refresh = now
         if not entered:
             self._emit_log("warn", "Unable to refresh course context.")
+            return
+        self._last_course_refresh = now
 
     def _handle_activity(self, activity):
         if not isinstance(activity, Mapping):

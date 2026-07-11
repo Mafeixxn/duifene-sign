@@ -202,6 +202,16 @@ class SignServiceTests(unittest.TestCase):
         self.assertTrue(self.service.poll_once())
         self.assertEqual(self.service.next_poll_delay, 5)
 
+    def test_retries_course_refresh_after_unsuccessful_enter(self):
+        self.api.enter_course = lambda course_id: (
+            self.api.entered_courses.append(course_id) or False
+        )
+
+        self.service.poll_once()
+        self.service.poll_once()
+
+        self.assertEqual(self.api.entered_courses, ["101", "101"])
+
     def test_login_expiry_stops_running_loop_and_reports_status(self):
         statuses = []
         waits = []
