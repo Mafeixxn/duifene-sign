@@ -77,6 +77,17 @@ class ApiClientTests(unittest.TestCase):
             {"authtype": ["1"], "code": [code], "state": ["1"]},
         )
 
+    def test_wechat_login_returns_exact_success_after_session_verification(self):
+        code = "a" * 32
+        self.api.check_login = lambda: True
+
+        self.assertEqual(
+            self.api.login_by_wechat_link(
+                f"https://example.test/callback?state=keep&code={code}"
+            ),
+            "微信链接登录成功",
+        )
+
     def test_form_values_with_reserved_characters_remain_structured(self):
         self.api.login_by_password("user&role=admin", "pass=word&token=abc")
 
