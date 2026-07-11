@@ -17,6 +17,7 @@ class SignService:
         self._request_in_flight = False
         self._next_poll_delay = 1000
         self._network_error_count = 0
+        self._generation = 0
         self._post_ui = None
         # 回调: (level, message)   level: "info" | "success" | "error" | "warn"
         self.callback = None
@@ -33,6 +34,10 @@ class SignService:
     def start_monitoring(self, course_id: str, class_id: str,
                          class_name: str, countdown: int, root,
                          post_ui=None):
+        course_id = str(course_id).strip()
+        class_id = str(class_id).strip()
+        self._generation += 1
+        generation = self._generation
         self._course_id = course_id
         self._class_id = class_id
         self._class_name = class_name
@@ -47,17 +52,24 @@ class SignService:
         self._root = root
         self._post_ui = post_ui or self._after_ui
 
-        threading.Thread(target=self._enter_course_worker, daemon=True).start()
+        threading.Thread(
+            target=self._enter_course_worker,
+            args=(generation, course_id),
+            daemon=True,
+        ).start()
 
-    def _enter_course_worker(self):
+    def _is_active(self, generation: int) -> bool:
+        return self._monitoring and generation == self._generation
+
+    def _enter_course_worker(self, generation: int, course_id: str):
         ok = False
         error = None
         try:
-            ok = self.api.enter_course(self._course_id)
+            ok = self.api.enter_course(course_id)
         except Exception as e:
             error = e
 
-        if not self._monitoring:
+        if not self._is_active(generation):
             return
 
         if error:
@@ -79,6 +91,7 @@ class SignService:
     def stop_monitoring(self):
         was_monitoring = self._monitoring
         self._monitoring = False
+        self._generation += 1
         if self._after_id:
             try:
                 self._root.after_cancel(self._after_id)
@@ -93,10 +106,14 @@ class SignService:
         if not self._monitoring or self._request_in_flight:
             return
         self._request_in_flight = True
-        threading.Thread(target=self._tick_worker, daemon=True).start()
+        generation = self._generation
+        threading.Thread(target=self._tick_worker, args=(generation,), daemon=True).start()
 
-    def _tick_worker(self):
+    def _tick_worker(self, generation: int | None = None):
+        generation = self._generation if generation is None else generation
         try:
+            if not self._is_active(generation):
+                return
             self._tick()
             self._network_error_count = 0
             self._next_poll_delay = 1000
@@ -113,10 +130,13 @@ class SignService:
         except Exception as e:
             self._log("error", f"轮询异常: {e}")
         finally:
-            if self._post_ui:
-                self._post_ui(self._finish_tick)
+            if self._post_ui and generation == self._generation:
+                self._post_ui(self._finish_tick, generation)
 
-    def _finish_tick(self):
+    def _finish_tick(self, generation: int | None = None):
+        generation = self._generation if generation is None else generation
+        if generation != self._generation:
+            return
         self._request_in_flight = False
         if self._monitoring:
             self._after_id = self._root.after(self._next_poll_delay, self._poll)
@@ -161,13 +181,13 @@ class SignService:
         self._heartbeat = 0
 
         checkin_id = activity.get("checkin_id", "")
-        class_ids = activity.get("class_ids", [])
+        class_ids = [str(value).strip() for value in activity.get("class_ids", [])]
 
         if not checkin_id:
             self._log("warn", "活动数据不完整: 缺少签到ID")
             return
 
-        if self._class_id not in class_ids:
+        if str(self._class_id).strip() not in class_ids:
             type_names = {"1": "签到码", "2": "二维码", "3": "定位"}
             tname = type_names.get(activity.get("type", ""), "未知")
             self._log("info", f"检测到{tname}签到，但不是本班 (本班ID:{self._class_id}, 活动班级:{','.join(class_ids)})")

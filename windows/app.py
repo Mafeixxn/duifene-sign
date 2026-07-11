@@ -12,6 +12,17 @@ import sv_ttk
 
 
 class App:
+    BG = "#F3F6FA"
+    SURFACE = "#FFFFFF"
+    BORDER = "#D8DEE9"
+    TEXT = "#18212F"
+    MUTED = "#697586"
+    PRIMARY = "#2563EB"
+    PRIMARY_DARK = "#1D4ED8"
+    SUCCESS = "#15803D"
+    WARN = "#B45309"
+    ERROR = "#C2410C"
+
     def __init__(self):
         self.config = ConfigManager()
         self.api = ApiClient(self.config)
@@ -20,22 +31,18 @@ class App:
         self.service.state_callback = self._on_service_state
 
         self._root = tk.Tk()
-        self._root.configure(bg="#EEF0F4")
+        self._root.configure(bg=self.BG)
         self._root.title("对分易自动签到")
-        self._root.resizable(False, False)
-        self._root.geometry("720x600")
+        self._root.resizable(True, True)
+        self._root.geometry(self._centered_geometry(
+            860,
+            680,
+            self._root.winfo_screenwidth(),
+            self._root.winfo_screenheight(),
+        ))
+        self._root.minsize(760, 650)
         self._root.option_add("*Font", ("Microsoft YaHei UI", 9))
-        sv_ttk.set_theme("light")
-
-        style = ttk.Style()
-        style.configure(".", font=("Microsoft YaHei UI", 9))
-        style.configure("TNotebook.Tab", font=("Microsoft YaHei UI", 9), padding=(16, 6))
-        style.configure("TButton", font=("Microsoft YaHei UI", 9), padding=(12, 6))
-        style.configure("TLabel", font=("Microsoft YaHei UI", 9))
-        style.configure("TEntry", font=("Microsoft YaHei UI", 9), padding=(8, 6))
-        style.configure("TCombobox", font=("Microsoft YaHei UI", 9))
-        style.configure("TNotebook", background="#FFFFFF", borderwidth=0)
-        style.configure("TFrame", background="#FFFFFF")
+        self._configure_styles()
 
         self._ui_queue = queue.Queue()
         self._login_in_flight = False
@@ -45,23 +52,96 @@ class App:
         self._selected_course = None
         self._course_by_label: dict[str, dict] = {}
         self._monitoring = False
+        self._last_window_size = (860, 680)
+        self._resize_after_id = None
+        self._log_hidden_for_resize = False
+        self._log_scroll_position = 0.0
         self._build_ui()
+        self._root.bind("<Configure>", self._on_root_configure, add="+")
         self._root.after(100, self._drain_ui_queue)
         self._root.after(0, self._try_restore_session)
 
     # ─── UI 构建 ───
 
+    @staticmethod
+    def _centered_geometry(width: int, height: int,
+                           screen_width: int, screen_height: int) -> str:
+        x = max(0, (screen_width - width) // 2)
+        y = max(0, (screen_height - height) // 2)
+        return f"{width}x{height}+{x}+{y}"
+
+    def _configure_styles(self):
+        try:
+            sv_ttk.set_theme("light")
+        except Exception:
+            pass
+
+        style = ttk.Style()
+        style.configure(".", font=("Microsoft YaHei UI", 9))
+        style.configure("TNotebook.Tab", font=("Microsoft YaHei UI", 9), padding=(18, 8))
+        style.configure("TButton", font=("Microsoft YaHei UI", 9), padding=(14, 7))
+        style.configure("Accent.TButton", font=("Microsoft YaHei UI", 10, "bold"), padding=(18, 8))
+        style.map("Accent.TButton",
+                  foreground=[("disabled", "#9CA3AF"), ("!disabled", "#FFFFFF")],
+                  background=[("active", self.PRIMARY_DARK), ("!disabled", self.PRIMARY)])
+        style.configure("TLabel", font=("Microsoft YaHei UI", 9), foreground=self.TEXT)
+        style.configure("Muted.TLabel", font=("Microsoft YaHei UI", 8), foreground=self.MUTED)
+        style.configure("Title.TLabel", font=("Microsoft YaHei UI", 18, "bold"), foreground=self.TEXT)
+        style.configure("Subtitle.TLabel", font=("Microsoft YaHei UI", 9), foreground=self.MUTED)
+        style.configure("Section.TLabel", font=("Microsoft YaHei UI", 10, "bold"), foreground=self.TEXT)
+        style.configure("Status.TLabel", font=("Microsoft YaHei UI", 8), foreground=self.MUTED)
+        style.configure("TEntry", font=("Microsoft YaHei UI", 9), padding=(8, 6))
+        style.configure("TCombobox", font=("Microsoft YaHei UI", 9), padding=(6, 4))
+        style.configure("TNotebook", background=self.SURFACE, borderwidth=0)
+        style.configure("TFrame", background=self.SURFACE)
+
+    def _make_card(self, parent, padx=14, pady=12):
+        card = tk.Frame(parent, bg=self.SURFACE, highlightbackground=self.BORDER,
+                        highlightthickness=1, bd=0)
+        inner = tk.Frame(card, bg=self.SURFACE)
+        inner.pack(fill=tk.BOTH, expand=True, padx=padx, pady=pady)
+        return card, inner
+
+    def _section_header(self, parent, title: str, subtitle: str = ""):
+        row = tk.Frame(parent, bg=self.SURFACE)
+        row.pack(fill=tk.X, pady=(0, 10))
+        ttk.Label(row, text=title, style="Section.TLabel",
+                  background=self.SURFACE).pack(anchor=tk.W)
+        if subtitle:
+            ttk.Label(row, text=subtitle, style="Muted.TLabel",
+                      background=self.SURFACE).pack(anchor=tk.W, pady=(2, 0))
+
     def _build_ui(self):
-        # 顶部 notebook（登录区）
-        login_card = tk.Frame(self._root, bg="#FFFFFF", highlightbackground="#DDE1E8",
-                             highlightthickness=1, bd=0)
-        login_card.pack(fill=tk.X, padx=12, pady=(12, 0))
+        self._root.grid_columnconfigure(0, weight=1)
+        self._root.grid_rowconfigure(2, weight=1)
 
-        self._notebook = ttk.Notebook(login_card)
-        self._notebook.pack(fill=tk.X, padx=2, pady=(2, 2))
+        header = tk.Frame(self._root, bg=self.BG)
+        header.grid(row=0, column=0, sticky="ew", padx=18, pady=(16, 8))
+        header.grid_columnconfigure(0, weight=1)
 
-        self._tab_link = tk.Frame(self._notebook, bg="#FFFFFF")
-        self._tab_pwd = tk.Frame(self._notebook, bg="#FFFFFF")
+        ttk.Label(header, text="对分易自动签到", style="Title.TLabel",
+                  background=self.BG).grid(row=0, column=0, sticky="w")
+        ttk.Label(header, text="登录课程后自动监听数字码、二维码和定位签到",
+                  style="Subtitle.TLabel", background=self.BG).grid(row=1, column=0, sticky="w", pady=(3, 0))
+        self._status_var = tk.StringVar(value="就绪")
+        self._status_badge = ttk.Label(header, textvariable=self._status_var,
+                                       style="Status.TLabel", background="#E8EEF8",
+                                       padding=(12, 5))
+        self._status_badge.grid(row=0, column=1, rowspan=2, sticky="e")
+
+        top = tk.Frame(self._root, bg=self.BG)
+        top.grid(row=1, column=0, sticky="ew", padx=18, pady=(0, 10))
+        top.grid_columnconfigure(0, weight=1)
+
+        login_card, login_inner = self._make_card(top)
+        login_card.grid(row=0, column=0, sticky="ew")
+
+        self._section_header(login_inner, "登录", "推荐使用微信 OAuth 链接，二维码签到仅支持该方式")
+        self._notebook = ttk.Notebook(login_inner)
+        self._notebook.pack(fill=tk.X)
+
+        self._tab_link = tk.Frame(self._notebook, bg=self.SURFACE)
+        self._tab_pwd = tk.Frame(self._notebook, bg=self.SURFACE)
         self._notebook.add(self._tab_link, text="微信链接登录")
         self._notebook.add(self._tab_pwd, text="账号密码登录")
         self._notebook.bind("<<NotebookTabChanged>>", self._on_tab_change)
@@ -69,112 +149,143 @@ class App:
         self._build_link_tab()
         self._build_pwd_tab()
 
-        # 中间控制栏
-        ctrl_card = tk.Frame(self._root, bg="#FFFFFF", highlightbackground="#DDE1E8",
-                            highlightthickness=1, bd=0)
-        ctrl_card.pack(fill=tk.X, padx=12, pady=(6, 0))
+        ctrl_card, ctrl = self._make_card(top)
+        ctrl_card.grid(row=1, column=0, sticky="ew", pady=(10, 0))
+        ctrl.grid_columnconfigure(1, weight=1)
 
-        ctrl = tk.Frame(ctrl_card, bg="#FFFFFF")
-        ctrl.pack(fill=tk.X, padx=10, pady=10)
-
-        ttk.Label(ctrl, text="选择课程:").pack(side=tk.LEFT)
+        ttk.Label(ctrl, text="监听设置", style="Section.TLabel",
+                  background=self.SURFACE).grid(row=0, column=0, columnspan=5, sticky="w", pady=(0, 10))
+        ttk.Label(ctrl, text="课程", background=self.SURFACE).grid(row=1, column=0, sticky="w")
         self._combo_var = tk.StringVar()
         self._combo = ttk.Combobox(ctrl, textvariable=self._combo_var,
-                                   state="readonly", width=25)
+                                   state="readonly")
         self._combo.bind("<<ComboboxSelected>>", self._on_course_select)
-        self._combo.pack(side=tk.LEFT, padx=(5, 0))
+        self._combo.grid(row=1, column=1, sticky="ew", padx=(8, 14))
 
-        ttk.Label(ctrl, text="  提前(秒):").pack(side=tk.LEFT)
+        ttk.Label(ctrl, text="提前秒数", background=self.SURFACE).grid(row=1, column=2, sticky="w")
         self._countdown_var = tk.StringVar(value=str(self.config.get_countdown()))
         self._countdown_entry = ttk.Entry(ctrl, textvariable=self._countdown_var, width=5)
-        self._countdown_entry.pack(side=tk.LEFT, padx=(2, 0))
+        self._countdown_entry.grid(row=1, column=3, sticky="w", padx=(8, 14))
 
         self._btn_toggle = ttk.Button(ctrl, text="开始监听签到",
+                                      style="Accent.TButton",
                                       command=self._toggle_monitor)
-        self._btn_toggle.pack(side=tk.RIGHT, padx=(10, 0))
+        self._btn_toggle.grid(row=1, column=4, sticky="e")
 
-        # 日志区域
-        log_card = tk.Frame(self._root, bg="#FFFFFF", highlightbackground="#DDE1E8",
-                           highlightthickness=1, bd=0)
-        log_card.pack(fill=tk.BOTH, expand=True, padx=12, pady=(6, 4))
+        log_card, self._log_inner = self._make_card(self._root, padx=12, pady=10)
+        log_card.grid(row=2, column=0, sticky="nsew", padx=18, pady=(0, 10))
 
-        log_frame = tk.Frame(log_card, bg="#FFFFFF")
-        log_frame.pack(fill=tk.BOTH, expand=True, padx=6, pady=(6, 6))
+        self._log_inner.grid_columnconfigure(0, weight=1)
+        self._log_inner.grid_rowconfigure(1, weight=1)
+        log_head = tk.Frame(self._log_inner, bg=self.SURFACE)
+        log_head.grid(row=0, column=0, sticky="ew", pady=(0, 8))
+        ttk.Label(log_head, text="运行日志", style="Section.TLabel",
+                  background=self.SURFACE).pack(side=tk.LEFT)
+        ttk.Label(log_head, text="登录提示、监听状态和签到结果会显示在这里",
+                  style="Muted.TLabel", background=self.SURFACE).pack(side=tk.LEFT, padx=(10, 0))
 
         self._log_text = scrolledtext.ScrolledText(
-            log_frame, width=80, height=20,
-            font=("Microsoft YaHei UI", 9), state=tk.DISABLED,
-            bg="#FFFFFF", fg="#1F2937",
+            self._log_inner, width=60, height=6,
+            font=("Consolas", 9), state=tk.DISABLED,
+            bg="#FBFCFE", fg=self.TEXT,
+            insertbackground=self.TEXT,
             relief=tk.FLAT, borderwidth=0,
-            padx=10, pady=8,
+            padx=12, pady=10,
         )
-        self._log_text.pack(fill=tk.BOTH, expand=True)
-        self._log_text.tag_config("success", foreground="#22A861")
-        self._log_text.tag_config("error", foreground="#DC143C")
-        self._log_text.tag_config("warn", foreground="#EB7D00")
-        self._log_text.tag_config("info", foreground="#1F2937")
+        self._log_text.grid(row=1, column=0, sticky="nsew")
+        self._log_text.tag_config("success", foreground=self.SUCCESS)
+        self._log_text.tag_config("error", foreground=self.ERROR)
+        self._log_text.tag_config("warn", foreground=self.WARN)
+        self._log_text.tag_config("info", foreground=self.TEXT)
 
         # 状态栏
-        self._status_var = tk.StringVar(value="就绪")
-        status_bar = tk.Frame(self._root, bg="#E8EAF0", height=28)
-        status_bar.pack(fill=tk.X, side=tk.BOTTOM)
+        status_bar = tk.Frame(self._root, bg="#E8EEF8", height=30)
+        status_bar.grid(row=3, column=0, sticky="ew")
         status_bar.pack_propagate(False)
         sb_label = ttk.Label(status_bar, textvariable=self._status_var,
-                            background="#E8EAF0", foreground="#6B7280",
-                            anchor=tk.W, padding=(10, 4),
-                            font=("Microsoft YaHei UI", 8))
+                            background="#E8EEF8", foreground=self.MUTED,
+                            anchor=tk.W, padding=(18, 5),
+                            style="Status.TLabel")
         sb_label.pack(fill=tk.BOTH, expand=True)
 
         # 初始显示链接登录页的说明
         self._show_link_help()
 
     def _build_link_tab(self):
-        f = tk.Frame(self._tab_link, bg="#FFFFFF")
-        f.pack(fill=tk.X, pady=(15, 8))
+        f = tk.Frame(self._tab_link, bg=self.SURFACE)
+        f.pack(fill=tk.X, padx=2, pady=(14, 10))
+        f.grid_columnconfigure(0, weight=1)
 
         ttk.Label(f, text="将微信OAuth链接粘贴到下方，点击登录",
-                  font=("Microsoft YaHei UI", 9)).pack(pady=(0, 8))
+                  style="Muted.TLabel", background=self.SURFACE).grid(row=0, column=0, sticky="w", pady=(0, 8))
 
         self._link_var = tk.StringVar()
         link_entry = ttk.Entry(f, textvariable=self._link_var,
                                font=("Microsoft YaHei UI", 10))
-        link_entry.pack(fill=tk.X, padx=20, pady=(0, 10))
+        link_entry.grid(row=1, column=0, sticky="ew", pady=(0, 10))
 
         self._btn_link_login = ttk.Button(f, text="微信链接登录",
                                           command=self._do_link_login)
-        self._btn_link_login.pack()
+        self._btn_link_login.grid(row=1, column=1, sticky="e", padx=(10, 0))
 
     def _build_pwd_tab(self):
-        f = tk.Frame(self._tab_pwd, bg="#FFFFFF")
-        f.pack(fill=tk.X, pady=(15, 8))
+        f = tk.Frame(self._tab_pwd, bg=self.SURFACE)
+        f.pack(fill=tk.X, padx=2, pady=(14, 10))
+        f.grid_columnconfigure(1, weight=1)
 
-        row1 = tk.Frame(f, bg="#FFFFFF")
-        row1.pack(fill=tk.X, padx=20, pady=4)
-        ttk.Label(row1, text="账号", width=6,
-                  font=("Microsoft YaHei UI", 10)).pack(side=tk.LEFT)
+        ttk.Label(f, text="账号", background=self.SURFACE).grid(row=0, column=0, sticky="w", pady=(0, 8))
         self._user_var = tk.StringVar()
-        ttk.Entry(row1, textvariable=self._user_var,
-                  font=("Microsoft YaHei UI", 10)).pack(side=tk.LEFT,
-                                                         fill=tk.X, expand=True)
+        ttk.Entry(f, textvariable=self._user_var,
+                  font=("Microsoft YaHei UI", 10)).grid(row=0, column=1, sticky="ew", pady=(0, 8))
 
-        row2 = tk.Frame(f, bg="#FFFFFF")
-        row2.pack(fill=tk.X, padx=20, pady=4)
-        ttk.Label(row2, text="密码", width=6,
-                  font=("Microsoft YaHei UI", 10)).pack(side=tk.LEFT)
+        ttk.Label(f, text="密码", background=self.SURFACE).grid(row=1, column=0, sticky="w", pady=(0, 8))
         self._pwd_var = tk.StringVar()
-        ttk.Entry(row2, textvariable=self._pwd_var, show="*",
-                  font=("Microsoft YaHei UI", 10)).pack(side=tk.LEFT,
-                                                        fill=tk.X, expand=True)
+        ttk.Entry(f, textvariable=self._pwd_var, show="*",
+                  font=("Microsoft YaHei UI", 10)).grid(row=1, column=1, sticky="ew", pady=(0, 8))
 
         ttk.Label(f, text="⚠ 账号密码登录不支持二维码签到",
-                  font=("Microsoft YaHei UI", 8),
-                  foreground="#888").pack(pady=(10, 5))
+                  style="Muted.TLabel", background=self.SURFACE).grid(row=2, column=1, sticky="w", pady=(2, 0))
 
         self._btn_pwd_login = ttk.Button(f, text="账号登录",
                                          command=self._do_pwd_login)
-        self._btn_pwd_login.pack(pady=(0, 10))
+        self._btn_pwd_login.grid(row=0, column=2, rowspan=2, sticky="ns", padx=(12, 0))
 
     # ─── 线程与 UI 调度 ───
+
+    def _on_root_configure(self, event):
+        if event.widget is not self._root:
+            return
+
+        size = (event.width, event.height)
+        if size == self._last_window_size:
+            return
+        self._last_window_size = size
+
+        if not self._log_hidden_for_resize:
+            self._log_scroll_position = self._log_text.yview()[0]
+            self._log_inner.grid_rowconfigure(
+                1, minsize=max(80, self._log_text.winfo_height()))
+            self._log_text.grid_remove()
+            self._log_hidden_for_resize = True
+
+        if self._resize_after_id is not None:
+            self._root.after_cancel(self._resize_after_id)
+        self._resize_after_id = self._root.after(120, self._finish_resize)
+
+    def _finish_resize(self):
+        if self._resize_after_id is not None:
+            try:
+                self._root.after_cancel(self._resize_after_id)
+            except tk.TclError:
+                pass
+            self._resize_after_id = None
+
+        if not self._log_hidden_for_resize:
+            return
+        self._log_inner.grid_rowconfigure(1, minsize=0)
+        self._log_text.grid()
+        self._log_text.yview_moveto(self._log_scroll_position)
+        self._log_hidden_for_resize = False
 
     def _post_ui(self, func, *args, **kwargs):
         self._ui_queue.put((func, args, kwargs))
