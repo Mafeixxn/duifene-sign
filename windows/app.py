@@ -136,18 +136,10 @@ class App:
         login_card, login_inner = self._make_card(top)
         login_card.grid(row=0, column=0, sticky="ew")
 
-        self._section_header(login_inner, "登录", "推荐使用微信 OAuth 链接，二维码签到仅支持该方式")
-        self._notebook = ttk.Notebook(login_inner)
-        self._notebook.pack(fill=tk.X)
-
-        self._tab_link = tk.Frame(self._notebook, bg=self.SURFACE)
-        self._tab_pwd = tk.Frame(self._notebook, bg=self.SURFACE)
-        self._notebook.add(self._tab_link, text="微信链接登录")
-        self._notebook.add(self._tab_pwd, text="账号密码登录")
-        self._notebook.bind("<<NotebookTabChanged>>", self._on_tab_change)
-
+        self._section_header(login_inner, "微信链接登录", "支持数字码、二维码和定位签到")
+        self._tab_link = tk.Frame(login_inner, bg=self.SURFACE)
+        self._tab_link.pack(fill=tk.X)
         self._build_link_tab()
-        self._build_pwd_tab()
 
         ctrl_card, ctrl = self._make_card(top)
         ctrl_card.grid(row=1, column=0, sticky="ew", pady=(10, 0))
@@ -228,28 +220,6 @@ class App:
                                           command=self._do_link_login)
         self._btn_link_login.grid(row=1, column=1, sticky="e", padx=(10, 0))
 
-    def _build_pwd_tab(self):
-        f = tk.Frame(self._tab_pwd, bg=self.SURFACE)
-        f.pack(fill=tk.X, padx=2, pady=(14, 10))
-        f.grid_columnconfigure(1, weight=1)
-
-        ttk.Label(f, text="账号", background=self.SURFACE).grid(row=0, column=0, sticky="w", pady=(0, 8))
-        self._user_var = tk.StringVar()
-        ttk.Entry(f, textvariable=self._user_var,
-                  font=("Microsoft YaHei UI", 10)).grid(row=0, column=1, sticky="ew", pady=(0, 8))
-
-        ttk.Label(f, text="密码", background=self.SURFACE).grid(row=1, column=0, sticky="w", pady=(0, 8))
-        self._pwd_var = tk.StringVar()
-        ttk.Entry(f, textvariable=self._pwd_var, show="*",
-                  font=("Microsoft YaHei UI", 10)).grid(row=1, column=1, sticky="ew", pady=(0, 8))
-
-        ttk.Label(f, text="⚠ 账号密码登录不支持二维码签到",
-                  style="Muted.TLabel", background=self.SURFACE).grid(row=2, column=1, sticky="w", pady=(2, 0))
-
-        self._btn_pwd_login = ttk.Button(f, text="账号登录",
-                                         command=self._do_pwd_login)
-        self._btn_pwd_login.grid(row=0, column=2, rowspan=2, sticky="ns", padx=(12, 0))
-
     # ─── 线程与 UI 调度 ───
 
     def _on_root_configure(self, event):
@@ -309,8 +279,6 @@ class App:
         login_state = tk.DISABLED if self._login_in_flight or self._restore_in_flight or self._monitoring or self._monitor_starting else tk.NORMAL
         if hasattr(self, "_btn_link_login"):
             self._btn_link_login.configure(state=login_state)
-        if hasattr(self, "_btn_pwd_login"):
-            self._btn_pwd_login.configure(state=login_state)
         if hasattr(self, "_btn_toggle"):
             toggle_state = tk.DISABLED if self._login_in_flight or self._restore_in_flight else tk.NORMAL
             self._btn_toggle.configure(state=toggle_state)
@@ -322,11 +290,6 @@ class App:
         self._refresh_controls()
 
     # ─── 事件处理 ───
-
-    def _on_tab_change(self, event):
-        idx = self._notebook.index(self._notebook.select())
-        if idx == 0:
-            self._show_link_help()
 
     def _show_link_help(self):
         self._append_log(
@@ -368,41 +331,11 @@ class App:
                     courses = self.api.get_course_list()
             except Exception as e:
                 error = e
-            self._post_ui(self._finish_login, "link", msg, courses, error, stage)
+            self._post_ui(self._finish_login, msg, courses, error, stage)
 
         self._run_bg(worker)
 
-    def _do_pwd_login(self):
-        if self._login_in_flight or self._restore_in_flight:
-            return
-        if self._monitoring or self._monitor_starting:
-            messagebox.showwarning("提示", "请先停止监听再重新登录")
-            return
-        user = self._user_var.get().strip()
-        pwd = self._pwd_var.get().strip()
-        if not user or not pwd:
-            messagebox.showerror("错误", "请输入账号和密码")
-            return
-
-        self._set_login_busy(True)
-
-        def worker():
-            msg = None
-            courses = None
-            error = None
-            stage = "login"
-            try:
-                msg = self.api.login_by_password(user, pwd)
-                if "成功" in msg:
-                    stage = "course"
-                    courses = self.api.get_course_list()
-            except Exception as e:
-                error = e
-            self._post_ui(self._finish_login, "pwd", msg, courses, error, stage)
-
-        self._run_bg(worker)
-
-    def _finish_login(self, login_type: str, msg: str | None,
+    def _finish_login(self, msg: str | None,
                       courses: list[dict] | None, error: Exception | None,
                       stage: str):
         self._set_login_busy(False)
@@ -426,10 +359,7 @@ class App:
             self._append_log(f"{msg}\n", "success")
             self._finish_load_courses(courses, restored=False)
         else:
-            if login_type == "link":
-                self._append_log(f"登录失败: {msg}\n", "error")
-            else:
-                self._append_log(f"{msg}\n", "error")
+            self._append_log(f"登录失败: {msg}\n", "error")
             self._status_var.set("就绪")
 
     def _load_courses(self):
