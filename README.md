@@ -4,12 +4,27 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/python-3.8+-blue.svg" alt="Python">
+  <img src="https://img.shields.io/badge/python-3.10+-blue.svg" alt="Python">
   <img src="https://img.shields.io/badge/platform-Windows%20%7C%20Android-lightgrey.svg" alt="Platform">
   <img src="https://img.shields.io/badge/license-MIT-green.svg" alt="License">
   <img src="https://img.shields.io/github/v/release/Mafeixxn/duifene-sign" alt="Release">
   <img src="https://img.shields.io/github/stars/Mafeixxn/duifene-sign?style=social" alt="Stars">
 </p>
+
+---
+
+## 目录
+
+- [项目简介](#-项目简介)
+- [快速下载](#-快速下载)
+- [功能特性](#-功能特性)
+- [签到类型支持](#-签到类型支持)
+- [Windows 桌面版使用](#windows-桌面版使用)
+- [Android 版使用](#-android-版使用)
+- [目录结构](#-目录结构)
+- [自动构建](#-自动构建)
+- [主要依赖](#-主要依赖)
+- [免责声明](#免责声明)
 
 ---
 
@@ -19,8 +34,10 @@
 
 本项目支持两种登录方式：
 
-- 微信 OAuth 链接登录：支持数字码、二维码、GPS 三种签到类型
-- 账号密码登录：支持数字码和 GPS 签到，不支持二维码签到
+| 登录方式 | 支持能力 | 备注 |
+|----------|----------|------|
+| 微信 OAuth 链接登录 | 数字码、二维码、GPS 三种签到类型 | 推荐使用 |
+| 账号密码登录 | 数字码和 GPS 签到 | 不支持二维码签到 |
 
 > [!WARNING]
 > - 经过测试,有一部分手机无法使用,具体原因未知
@@ -30,20 +47,23 @@
   
 ## 📥 快速下载
 
-| 版本 | 适用平台 | 获取方式 |
-|------|---------|----------|
-| Android APK | Android 7.0+ | 下载 [`android/duifene_sign.apk`](android/duifene_sign.apk) |
-| Windows 桌面版 | Windows 10 / 11 | [GitHub Releases](../../releases) 下载 exe，或克隆仓库运行源码 |
+| 版本 | 适用平台 | 获取方式 | 适合场景 |
+|------|----------|----------|----------|
+| Android APK | Android 7.0+ | 下载 [`android/duifene_sign.apk`](android/duifene_sign.apk) | 手机直接安装使用 |
+| Windows 桌面版 | Windows 10 / 11 | [GitHub Releases](../../releases) 下载 exe，或克隆仓库运行源码 | 桌面监听、调试和打包 |
 
 ## ✨ 功能特性
 
-- 微信链接登录：粘贴微信 OAuth 回调链接即可登录
-- 账号密码登录：可直接使用对分易账号和密码登录
-- 会话保持：自动保存 Cookie，下次启动可恢复登录状态
-- 课程选择：自动拉取课程列表，支持切换目标课程
-- 提前签到：可设置倒计时提前量，提前尝试完成签到
-- 签到通知：Windows 版支持桌面通知提醒签到结果
-- 多端支持：提供 Windows tkinter 桌面版和 Android Kivy 版
+| 功能 | 说明 |
+|------|------|
+| 微信链接登录 | 粘贴微信 OAuth 回调链接即可登录。 |
+| 账号密码登录 | 可直接使用对分易账号和密码登录。 |
+| 会话保持 | 自动保存 Cookie，下次启动可恢复登录状态。 |
+| 配置保护 | Windows 版使用本地 `duifenyi.ini` 保存运行配置，仓库仅保留 `duifenyi.example.ini` 模板。 |
+| 课程选择 | 自动拉取课程列表，支持切换目标课程。 |
+| 提前签到 | 可设置倒计时提前量，提前尝试完成签到。 |
+| 签到通知 | Windows 版支持桌面通知提醒签到结果。 |
+| 多端支持 | 提供 Windows tkinter 桌面版和 Android Kivy 版。 |
 
 ## 📋 签到类型支持
 
@@ -55,9 +75,13 @@
 
 ## 🖥️ Windows 桌面版使用
 
-### 直接下载exe的话就请跳到第三步
+> [!IMPORTANT]
+> 如果直接下载 exe，可以跳过“安装依赖”和“启动程序”，直接从“登录方式”开始。
 
 ### 1. 安装依赖
+
+> [!TIP]
+> Windows 源码运行建议使用 Python 3.10 及以上版本。
 
 ```bash
 git clone https://github.com/Mafeixxn/duifene-sign.git
@@ -72,6 +96,9 @@ python main.py
 ```
 
 也可以双击 `对分易签到.pyw` 启动无控制台窗口版本
+
+> [!NOTE]
+> 程序首次运行会在本地生成或更新 `duifenyi.ini`。该文件可能包含用于恢复登录状态的 Cookie，请不要提交到 Git，也不要分享给他人。
 
 ### 3. 登录方式
 
@@ -143,14 +170,14 @@ python main.py
 │   ├── build_apk.ipynb   # Google Colab 构建脚本
 │   └── duifene_sign.apk  # 预构建 APK 安装包
 ├── windows/              # Windows tkinter 桌面版
-│   ├── main.py           # 程序入口
-│   ├── app.py            # tkinter 图形界面
-│   ├── api_client.py     # 对分易 API 封装
-│   ├── sign_service.py   # 签到监控逻辑
-│   ├── config_manager.py # 配置存取
-│   ├── duifenyi.ini      # 配置文件模板
-│   ├── requirements.txt  # 依赖清单
-│   └── 对分易签到.pyw     # 无控制台启动入口
+│   ├── main.py              # 程序入口
+│   ├── app.py               # tkinter 图形界面
+│   ├── api_client.py        # 对分易 API 封装
+│   ├── sign_service.py      # 签到监控逻辑
+│   ├── config_manager.py    # 配置存取
+│   ├── duifenyi.example.ini # 配置模板，实际运行使用本地 duifenyi.ini
+│   ├── requirements.txt     # 依赖清单
+│   └── 对分易签到.pyw        # 无控制台启动入口
 ├── LICENSE
 └── README.md
 ```
@@ -158,6 +185,13 @@ python main.py
 ## 🔧 自动构建
 
 推送版本标签（`v*`）后，GitHub Actions 会自动构建 Windows exe 并发布到 [Releases](../../releases)，同时附带预构建的 Android APK
+
+> [!TIP]
+> 发布前建议确认：
+>
+> - Windows 依赖已安装完整。
+> - `duifenyi.ini` 没有被提交或打包进源码仓库。
+> - Release 页面中的 exe 与当前标签版本一致。
 
 ## 📦 主要依赖
 
