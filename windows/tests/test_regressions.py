@@ -247,6 +247,24 @@ class AppHelperTests(unittest.TestCase):
         finally:
             root.destroy()
 
+    def test_password_login_controls_are_not_exposed(self):
+        try:
+            app = App()
+        except tk.TclError as exc:
+            self.skipTest(f"Tk display unavailable: {exc}")
+
+        root = app._root
+        try:
+            for callback_id in root.tk.call("after", "info"):
+                root.after_cancel(callback_id)
+            root.update()
+            for attribute in ("_tab_pwd", "_user_var", "_pwd_var", "_btn_pwd_login"):
+                self.assertFalse(hasattr(app, attribute), attribute)
+        finally:
+            for callback_id in root.tk.call("after", "info"):
+                root.after_cancel(callback_id)
+            root.destroy()
+
     def test_resize_debounces_log_redraw(self):
         try:
             app = App()
