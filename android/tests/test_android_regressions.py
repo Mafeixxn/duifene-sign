@@ -1,8 +1,12 @@
+import json
+import tempfile
 import unittest
 from urllib.parse import parse_qs, urlparse
 
 from android.api_client import ApiClient
+from android.session_store import SessionStore
 from android.sign_service import SignService
+from android.service_state import ServiceState
 
 
 class FakeResponse:
@@ -232,6 +236,82 @@ class SignServiceTests(unittest.TestCase):
         self.assertEqual(statuses, [True, False])
         self.assertEqual(waits, [])
         self.assertFalse(self.service.is_running)
+
+
+class PrivateStorageTests(unittest.TestCase):
+    def setUp(self):
+        self.temp_dir = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp_dir.cleanup)
+        self.base_dir = self.temp_dir.name
+
+    def test_missing_cookie_file_loads_as_signed_out(self):
+        self.assertEqual(SessionStore(self.base_dir).load_cookie(), "")
+
+    def test_cookie_round_trips_as_utf8(self):
+        store = SessionStore(self.base_dir)
+        cookie = "session=\u6d4b\u8bd5; name=\u771f\u5bfb"
+
+        store.save_cookie(cookie)
+
+        self.assertEqual(store.load_cookie(), cookie)
+
+    def test_clear_removes_saved_cookie(self):
+        store = SessionStore(self.base_dir)
+        store.save_cookie("session=active")
+
+        store.clear()
+
+        self.assertEqual(store.load_cookie(), "")
+
+    def test_monitor_configuration_replaces_previous_json_atomically(self):
+        state = ServiceState(self.base_dir)
+        initial_config = {"course_id": "old", "countdown": 10}
+        config = {"course_id": "new", "class_id": "7", "countdown": 0}
+        state.write_config(initial_config)
+
+        state.write_config(config)
+
+        self.assertEqual(state.read_config(), config)
+        self.assertEqual(
+            json.loads((state.base_dir / state.CONFIG_FILE).read_text(encoding="utf-8")),
+            config,
+        )
+
+    def test_stop_marker_can_be_requested_and_cleared(self):
+        state = ServiceState(self.base_dir)
+
+        self.assertFalse(state.stop_requested())
+        state.request_stop()
+        self.assertTrue(state.stop_requested())
+        state.clear_stop()
+        self.assertFalse(state.stop_requested())
+
+    def test_event_reader_ignores_malformed_json_lines(self):
+        state = ServiceState(self.base_dir)
+        state.append_event({"level": "info", "message": "first"})
+        with state.events_path.open("a", encoding="utf-8") as event_file:
+            event_file.write("not json\n")
+            event_file.write('["not", "an", "event"]\n')
+        state.append_event({"level": "success", "message": "done"})
+
+        self.assertEqual(
+            state.read_events(),
+            [
+                {"level": "info", "message": "first"},
+                {"level": "success", "message": "done"},
+            ],
+        )
+
+    def test_event_log_retains_only_the_most_recent_bounded_events(self):
+        state = ServiceState(self.base_dir)
+        for index in range(state.MAX_EVENT_LINES + 2):
+            state.append_event({"index": index})
+
+        events = state.read_events()
+
+        self.assertEqual(len(events), state.MAX_EVENT_LINES)
+        self.assertEqual(events[0], {"index": 2})
+        self.assertEqual(events[-1], {"index": state.MAX_EVENT_LINES + 1})
 
 
 if __name__ == "__main__":
