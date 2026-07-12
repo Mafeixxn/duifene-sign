@@ -6,6 +6,7 @@ import sys
 import time
 from collections.abc import Mapping
 from pathlib import Path
+from uuid import uuid4
 
 
 SOURCE_DIR = str(Path(__file__).resolve().parents[1])
@@ -69,6 +70,7 @@ class StopMarker:
 def _append_event(state, level, message):
     state.append_event(
         {
+            "event_id": uuid4().hex,
             "level": str(level),
             "message": str(message),
             "timestamp": int(time.time()),

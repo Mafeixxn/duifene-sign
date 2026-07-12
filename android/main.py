@@ -118,7 +118,7 @@ def restored_monitoring_state(config_available, stop_requested, events):
 
 
 class EventIdentityTracker:
-    """Deduplicate retained service events by their stable serialized identity."""
+    """Deduplicate retained service events by ID with legacy tuple fallback."""
 
     def __init__(self, max_seen=400):
         self.max_seen = max(1, int(max_seen))
@@ -127,7 +127,12 @@ class EventIdentityTracker:
 
     @staticmethod
     def identity(event):
-        return tuple(str(event.get(field, "")) for field in ("timestamp", "level", "message"))
+        if "event_id" in event:
+            return "event_id", str(event["event_id"])
+        return (
+            "legacy",
+            *(str(event.get(field, "")) for field in ("timestamp", "level", "message")),
+        )
 
     @property
     def seen_count(self):

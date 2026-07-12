@@ -15,6 +15,7 @@ from android.sign_service import SignService
 from android.service_state import ServiceState
 from android.service.main import (
     StopMarker,
+    _append_event,
     load_monitor_config,
     parse_service_argument,
     resolve_private_app_dir,
@@ -364,6 +365,23 @@ class PrivateStorageTests(unittest.TestCase):
 
 
 class ForegroundServiceTests(unittest.TestCase):
+    def test_service_events_persist_unique_uuid_hex_event_ids(self):
+        with tempfile.TemporaryDirectory() as base_dir:
+            state = ServiceState(base_dir)
+
+            _append_event(state, "info", "same physical payload")
+            _append_event(state, "info", "same physical payload")
+
+            events = state.read_events()
+
+        event_ids = [event["event_id"] for event in events]
+        self.assertEqual(len(event_ids), 2)
+        self.assertEqual(len(set(event_ids)), 2)
+        for event_id in event_ids:
+            with self.subTest(event_id=event_id):
+                self.assertEqual(len(event_id), 32)
+                self.assertEqual(format(int(event_id, 16), "032x"), event_id)
+
     def test_buildozer_declares_android_15_data_sync_service_contract(self):
         parser = configparser.ConfigParser(interpolation=None)
         spec_path = Path(__file__).resolve().parents[1] / "buildozer.spec"
@@ -584,7 +602,30 @@ class ActivityUiTests(unittest.TestCase):
         self.assertEqual(tracker.unseen(after_pause), after_pause)
         self.assertLessEqual(tracker.seen_count, 400)
 
-    def test_event_identity_uses_timestamp_level_and_message(self):
+    def test_event_identity_tracker_processes_physical_duplicates_with_distinct_ids(self):
+        tracker = self._activity_module().EventIdentityTracker(max_seen=10)
+        common = {"timestamp": 1, "level": "info", "message": "same"}
+        events = [
+            {**common, "event_id": "event-a"},
+            {**common, "event_id": "event-b"},
+        ]
+
+        self.assertEqual(tracker.unseen(events), events)
+        self.assertEqual(tracker.unseen(events), [])
+
+    def test_event_id_identity_memory_remains_bounded(self):
+        tracker = self._activity_module().EventIdentityTracker(max_seen=3)
+        events = [
+            {"event_id": f"event-{index}", "timestamp": 1,
+             "level": "info", "message": "same"}
+            for index in range(5)
+        ]
+
+        self.assertEqual(tracker.unseen(events), events)
+        self.assertEqual(tracker.seen_count, 3)
+        self.assertEqual(tracker.unseen([events[-1]]), [])
+
+    def test_legacy_event_identity_uses_timestamp_level_and_message(self):
         tracker = self._activity_module().EventIdentityTracker(max_seen=10)
         events = [
             {"timestamp": 1, "level": "info", "message": "same"},
@@ -594,6 +635,9 @@ class ActivityUiTests(unittest.TestCase):
 
         self.assertEqual(tracker.unseen(events), events)
         self.assertEqual(tracker.unseen(events), [])
+
+        duplicate = {"timestamp": 3, "level": "info", "message": "legacy"}
+        self.assertEqual(tracker.unseen([duplicate, dict(duplicate)]), [duplicate])
 
     def test_malformed_overflow_timestamp_uses_current_time_fallback(self):
         event_moment = self._activity_module().event_moment
