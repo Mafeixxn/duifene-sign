@@ -5,14 +5,15 @@ package.domain = org.example
 source.dir = .
 source.include_exts = py,png,jpg,kv,atlas,txt
 version = 1.1
-requirements = python3,kivy==2.2.1,requests
+requirements = python3,kivy==2.3.1,requests==2.34.2
+services = monitor:service/main.py:foreground:sticky:foregroundServiceType=dataSync
 orientation = portrait
 osx.python_version = 3
 osx.kivy_version = 2.3.0
 fullscreen = 0
-android.permissions = INTERNET, ACCESS_NETWORK_STATE
-android.api = 33
-android.minapi = 21
+android.permissions = INTERNET, ACCESS_NETWORK_STATE, FOREGROUND_SERVICE, FOREGROUND_SERVICE_DATA_SYNC, POST_NOTIFICATIONS
+android.api = 35
+android.minapi = 29
 android.ndk = 25b
 android.gradle_dependencies =
 android.archs = arm64-v8a

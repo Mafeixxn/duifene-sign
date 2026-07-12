@@ -1,12 +1,21 @@
+import configparser
 import json
 import tempfile
 import unittest
+from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
 from android.api_client import ApiClient
 from android.session_store import SessionStore
 from android.sign_service import SignService
 from android.service_state import ServiceState
+from android.service.main import (
+    StopMarker,
+    load_monitor_config,
+    parse_service_argument,
+    resolve_private_app_dir,
+    run_monitor,
+)
 
 
 class FakeResponse:
@@ -349,6 +358,87 @@ class PrivateStorageTests(unittest.TestCase):
         self.assertEqual(events[0], {"index": 2})
         self.assertEqual(events[-1], {"index": state.MAX_EVENT_LINES + 1})
 
+
+class ForegroundServiceTests(unittest.TestCase):
+    def test_buildozer_declares_android_15_data_sync_service_contract(self):
+        parser = configparser.ConfigParser(interpolation=None)
+        spec_path = Path(__file__).resolve().parents[1] / "buildozer.spec"
+        parser.read(spec_path, encoding="utf-8")
+
+        app = parser["app"]
+        requirements = {item.strip() for item in app["requirements"].split(",")}
+        permissions = {item.strip() for item in app["android.permissions"].split(",")}
+
+        self.assertEqual(
+            app["services"],
+            "monitor:service/main.py:foreground:sticky:foregroundServiceType=dataSync",
+        )
+        self.assertEqual(app["android.api"], "35")
+        self.assertEqual(app["android.minapi"], "29")
+        self.assertEqual(app["android.archs"], "arm64-v8a")
+        self.assertIn("kivy==2.3.1", requirements)
+        self.assertIn("requests==2.34.2", requirements)
+        self.assertTrue(
+            {
+                "INTERNET",
+                "ACCESS_NETWORK_STATE",
+                "FOREGROUND_SERVICE",
+                "FOREGROUND_SERVICE_DATA_SYNC",
+                "POST_NOTIFICATIONS",
+            }.issubset(permissions)
+        )
+
+    def test_bootstrap_helpers_parse_argument_and_prefer_shared_monitor_state(self):
+        self.assertEqual(parse_service_argument("not-json"), {})
+        self.assertEqual(parse_service_argument("[]"), {})
+        argument_config = {"cookie": "argument", "course_id": "1"}
+        self.assertEqual(parse_service_argument(json.dumps(argument_config)), argument_config)
+
+        with tempfile.TemporaryDirectory() as base_dir:
+            state = ServiceState(base_dir)
+            shared_config = {"cookie": "shared", "course_id": "2"}
+            state.write_config(shared_config)
+
+            self.assertEqual(load_monitor_config(state, json.dumps(argument_config)), shared_config)
+
+    def test_stop_marker_and_private_directory_helpers_use_service_state_and_context(self):
+        class FakeFilesDir:
+            def getAbsolutePath(self):
+                return "."
+
+        class FakeContext:
+            def getFilesDir(self):
+                return FakeFilesDir()
+
+        with tempfile.TemporaryDirectory() as base_dir:
+            state = ServiceState(base_dir)
+            marker = StopMarker(state)
+
+            self.assertFalse(marker.is_set())
+            state.request_stop()
+            self.assertTrue(marker.is_set())
+
+        self.assertEqual(resolve_private_app_dir(FakeContext()), str(Path(".").resolve()))
+
+    def test_bootstrap_rejects_none_monitor_fields_before_constructing_api(self):
+        with tempfile.TemporaryDirectory() as base_dir:
+            state = ServiceState(base_dir)
+            state.write_config(
+                {
+                    "cookie": None,
+                    "course_id": "1",
+                    "class_id": "2",
+                    "class_name": "Physics",
+                }
+            )
+
+            run_monitor(
+                state,
+                "",
+                api_factory=lambda cookie: self.fail("API must not be constructed"),
+            )
+
+            self.assertEqual(state.read_events()[-1]["level"], "error")
 
 if __name__ == "__main__":
     unittest.main()
