@@ -1,467 +1,632 @@
-"""对分易自动签到 — Android APK 版"""
+"""One-screen Kivy activity for OAuth login and foreground monitoring."""
 
-import sys
-import traceback
-import os
 import datetime
+import json
+import threading
+from collections import Counter
 
-# ── crash handler ──────────────────────────────────────────
+try:
+    from .api_client import ApiClient
+    from .service_state import ServiceState
+    from .session_store import SessionStore
+except ImportError:  # python-for-android runs this file as a top-level module.
+    from api_client import ApiClient
+    from service_state import ServiceState
+    from session_store import SessionStore
 
-_CRASH_LOG = "crash.log"
-_excepthook_installed = False
+
+DEFAULT_COUNTDOWN = 10
+SERVICE_CLASS = "org.example.duifene_sign.ServiceMonitor"
 
 
-def _install_crash_handler():
-    global _excepthook_installed
-    if _excepthook_installed:
-        return
-    _excepthook_installed = True
-    _orig = sys.excepthook
-
-    def _handler(exc_type, exc_value, exc_tb):
-        tb_str = "".join(traceback.format_exception(exc_type, exc_value, exc_tb))
+def normalize_countdown(value, default=DEFAULT_COUNTDOWN):
+    """Return an integer countdown, falling back and clamping below zero."""
+    try:
+        countdown = int(value)
+    except (TypeError, ValueError):
         try:
-            with open(_CRASH_LOG, "w") as f:
-                f.write(tb_str)
-        except Exception:
-            pass
-        try:
-            from kivy.uix.popup import Popup
-            from kivy.uix.label import Label
-            from kivy.app import App
-            app = App.get_running_app()
-            if app is not None:
-                popup = Popup(
-                    title="应用程序崩溃",
-                    content=Label(text=tb_str[:800], font_size=11),
-                    size_hint=(0.95, 0.8),
-                    auto_dismiss=False,
-                )
-                popup.open()
-                return
-        except Exception:
-            pass
-        _orig(exc_type, exc_value, exc_tb)
-
-    sys.excepthook = _handler
+            countdown = int(default)
+        except (TypeError, ValueError):
+            countdown = DEFAULT_COUNTDOWN
+    return max(0, countdown)
 
 
-_install_crash_handler()
-
-# ── imports ────────────────────────────────────────────────
-
-from kivy.app import App
-from kivy.clock import Clock, mainthread
-from kivy.uix.boxlayout import BoxLayout
-from kivy.uix.tabbedpanel import TabbedPanel, TabbedPanelItem
-from kivy.uix.spinner import Spinner
-from kivy.uix.button import Button
-from kivy.uix.label import Label
-from kivy.uix.textinput import TextInput
-from kivy.uix.scrollview import ScrollView
-from kivy.utils import platform
-from kivy.metrics import dp
-from kivy.graphics import Color, RoundedRectangle
-
-from api_client import ApiClient
-from sign_service import SignService
-
-COOKIE_FILE = "cookie.txt"
-
-# ── theme ──────────────────────────────────────────────────
-
-# color palette
-C1 = (0.26, 0.52, 0.96, 1)   # primary blue
-C1_DIM = (0.18, 0.38, 0.75, 1)  # pressed blue
-C_GREEN = (0.20, 0.72, 0.44, 1)
-C_RED = (0.92, 0.30, 0.24, 1)
-C_ORANGE = (0.98, 0.60, 0.04, 1)
-C_BG = (0.94, 0.94, 0.95, 1)
-C_CARD = (1, 1, 1, 1)
-C_TEXT = (0.10, 0.10, 0.10, 1)
-C_HINT = (0.55, 0.55, 0.58, 1)
-C_BORDER = (0.82, 0.82, 0.85, 1)
-C_DISABLED = (0.70, 0.70, 0.72, 1)
-
-R = dp(10)      # corner radius
-F_TITLE = dp(18)
-F_BODY = dp(14)
-F_SMALL = dp(12)
-
-
-def _flat_btn(text, color=C1, text_color=(1, 1, 1, 1), font_size=F_BODY,
-              height=dp(46), disabled=False, on_press=None):
-    """Flat rounded button — cleaner than default gradient."""
-    btn = Button(
-        text=text, font_size=font_size, bold=True,
-        size_hint_y=None, height=height,
-        background_normal="", background_down="",
-        color=text_color,
-        background_color=C_DISABLED if disabled else color,
-        on_press=on_press,
-    )
-    if disabled:
-        btn.disabled = True
-    # rounded corners via canvas
-    btn.bind(pos=lambda i, _: _draw_round_rect(i), size=lambda i, _: _draw_round_rect(i))
-    return btn
-
-
-def _draw_round_rect(widget):
-    widget.canvas.before.clear()
-    with widget.canvas.before:
-        Color(*widget.background_color[:3], 1)
-        RoundedRectangle(pos=widget.pos, size=widget.size, radius=[dp(8)])
-
-
-def _styled_input(hint, password=False, multiline=False, height=dp(46)):
-    """Styled text input — simple flat style, no canvas to avoid GPU state leak."""
-    return TextInput(
-        hint_text=hint, multiline=multiline,
-        password=password,
-        font_size=F_BODY,
-        size_hint_y=None, height=height,
-        background_color=(0.96, 0.96, 0.97, 1),
-        foreground_color=(0, 0, 0, 1),
-        hint_text_color=C_HINT,
-        cursor_color=C1,
-        padding=[dp(12), dp(10), dp(12), dp(10)],
-        cursor_width=dp(1.5),
-    )
-
-
-def _card(inner, padding=dp(12)):
-    """Wrap a widget in a white rounded card."""
-    from kivy.uix.anchorlayout import AnchorLayout
-    anchor = AnchorLayout(size_hint_y=None, padding=padding)
-    anchor.height = inner.height + padding * 2
-    inner.bind(height=lambda i, h: setattr(anchor, 'height', h + padding * 2))
-    anchor.add_widget(inner)
-    anchor.bind(pos=lambda i, _: _draw_card_bg(anchor),
-                size=lambda i, _: _draw_card_bg(anchor))
-    return anchor
-
-
-def _draw_card_bg(widget):
-    widget.canvas.before.clear()
-    with widget.canvas.before:
-        Color(*C_CARD)
-        RoundedRectangle(pos=widget.pos, size=widget.size, radius=[dp(12)])
-
-
-def _section_label(text):
-    return Label(
-        text=text, font_size=F_SMALL + dp(1), bold=True,
-        color=C_HINT, size_hint_y=None, height=dp(28),
-        halign="left", valign="bottom",
-        padding=[dp(4), 0],
-    )
-
-
-# ── main panel ─────────────────────────────────────────────
-
-class SignPanel(BoxLayout):
-    def __init__(self, **kw):
-        super().__init__(**kw)
-        self.orientation = "vertical"
-        self.padding = [dp(12), dp(8)]
-        self.spacing = dp(8)
-
-        self.api = ApiClient(self._load_cookie())
-        self.svc = SignService(self.api)
-        self.svc.on_log = self._on_log
-        self.svc.on_status = self._on_status
-
-        self._courses = []
-        self._selected_course = None
-        self._monitoring = False
-
-        self._build()
-
-    # ─── cookie ────────────────────────────────────────────
-
-    def _load_cookie(self) -> str:
-        if os.path.exists(COOKIE_FILE):
-            with open(COOKIE_FILE) as f:
-                return f.read().strip()
-        return ""
-
-    def _save_cookie(self):
-        with open(COOKIE_FILE, "w") as f:
-            f.write(self.api.export_cookie())
-
-    # ─── UI ────────────────────────────────────────────────
-
-    def _build(self):
-        # ── 头部 ──
-        header = BoxLayout(orientation="vertical",
-                          size_hint_y=None, height=dp(42), spacing=0)
-        title = Label(
-            text="对分易 自动签到", font_size=F_TITLE, bold=True,
-            color=C1, size_hint_y=None, height=dp(30),
-            halign="center", valign="middle",
-        )
-        header.add_widget(title)
-        self.add_widget(header)
-
-        # ── 登录区域 ──
-        self._login_box = BoxLayout(orientation="vertical", spacing=dp(6),
-                                    size_hint_y=None, height=dp(280))
-        self._build_login_pwd()
-        self.add_widget(self._login_box)
-
-        # ── 课程 + 控制 ──
-        self._ctrl_box = BoxLayout(orientation="vertical", spacing=dp(6),
-                                   size_hint_y=None, height=dp(160))
-        self._build_controls()
-        self.add_widget(self._ctrl_box)
-
-        # ── 日志 ──
-        self.add_widget(_section_label("签到日志"))
-        scroll = ScrollView(size_hint_y=1)
-        self._log_label = Label(
-            text="", font_size=F_SMALL, markup=True,
-            size_hint_y=None, valign="top", halign="left",
-            padding=[dp(6), dp(4)],
-        )
-        self._log_label.bind(texture_size=lambda i, s: setattr(i, 'height', s[1]))
-        scroll.add_widget(self._log_label)
-        self.add_widget(scroll)
-
-    def _build_login_pwd(self):
-        box = BoxLayout(orientation="vertical", spacing=dp(6), padding=[dp(4), 0])
-        self._user_input = _styled_input("账号", height=dp(46))
-        self._pwd_input = _styled_input("密码", password=True, height=dp(46))
-        self._link_input = _styled_input("粘贴微信 OAuth 链接...", multiline=True, height=dp(72))
-
-        btn_row = BoxLayout(orientation="horizontal", spacing=dp(8),
-                           size_hint_y=None, height=dp(46))
-        btn_row.add_widget(_flat_btn("密码登录", C1, on_press=lambda _: self._do_pwd_login()))
-        btn_row.add_widget(_flat_btn("微信登录", (0.06, 0.75, 0.55, 1),
-                                     on_press=lambda _: self._do_link_login()))
-
-        box.add_widget(Label(
-            text="密码登录 — 不支持二维码签到   微信登录 — 支持全部",
-            font_size=F_SMALL - dp(1), color=C_HINT,
-            size_hint_y=None, height=dp(18),
-        ))
-        box.add_widget(self._user_input)
-        box.add_widget(self._pwd_input)
-        box.add_widget(self._link_input)
-        box.add_widget(btn_row)
-        self._login_box.add_widget(box)
-
-    def _build_controls(self):
-        box = BoxLayout(orientation="vertical", spacing=dp(6), padding=[dp(4), 0])
-
-        # 课程 + 倒计时
-        row1 = BoxLayout(orientation="horizontal", spacing=dp(6),
-                        size_hint_y=None, height=dp(44))
-        row1.add_widget(Label(
-            text="课程", font_size=F_BODY, color=C_TEXT,
-            size_hint_x=0.18, halign="right", valign="middle",
-        ))
-        self._spinner = Spinner(
-            text="请先登录", font_size=F_BODY,
-            size_hint_x=0.55, background_normal="", background_down="",
-            background_color=C_CARD, color=(0, 0, 0, 1),
-        )
-        self._spinner.bind(text=self._on_course_select)
-        row1.add_widget(self._spinner)
-
-        row1.add_widget(Label(
-            text="提前(s)", font_size=F_SMALL, color=C_HINT,
-            size_hint_x=0.12, halign="right", valign="middle",
-        ))
-        self._cd_input = TextInput(
-            text="10", multiline=False, font_size=F_BODY,
-            size_hint_x=0.15, input_filter="int",
-            background_color=(0.96, 0.96, 0.97, 1),
-            foreground_color=(0, 0, 0, 1),
-            cursor_color=C1, padding=[dp(24), dp(10), 0, dp(10)],
-            halign="center", cursor_width=dp(1.5),
-        )
-        row1.add_widget(self._cd_input)
-        box.add_widget(row1)
-
-        # 按钮
-        row2 = BoxLayout(orientation="horizontal", spacing=dp(10),
-                        size_hint_y=None, height=dp(46))
-        self._btn_start = _flat_btn("开始监控", C1,
-                                    on_press=lambda _: self._toggle())
-        self._btn_stop = _flat_btn("停止", C_RED, disabled=True,
-                                   on_press=lambda _: self._stop())
-        row2.add_widget(self._btn_start)
-        row2.add_widget(self._btn_stop)
-        box.add_widget(row2)
-        self._ctrl_box.add_widget(box)
-
-    # ─── 登录 ──────────────────────────────────────────────
-
-    def _do_pwd_login(self):
-        user = self._user_input.text.strip()
-        pwd = self._pwd_input.text.strip()
-        if not user or not pwd:
-            self._log("warn", "请输入账号和密码")
-            return
-        self._log("info", "正在登录...")
-        try:
-            msg = self.api.login_by_password(user, pwd)
-            self._log("success" if "成功" in msg else "error", msg)
-            if "成功" in msg:
-                self._save_cookie()
-                self._load_courses()
-        except Exception as e:
-            self._log("error", str(e))
-
-    def _do_link_login(self):
-        link = self._link_input.text.strip()
-        if not link or "code=" not in link:
-            self._log("warn", "链接无效，需包含 code 参数")
-            return
-        self._log("info", "正在登录...")
-        try:
-            msg = self.api.login_by_wechat_link(link)
-            self._log("success" if "成功" in msg else "error", msg)
-            if "成功" in msg:
-                self._save_cookie()
-                self._load_courses()
-        except Exception as e:
-            self._log("error", str(e))
-
-    # ─── 课程 ──────────────────────────────────────────────
-
-    def _load_courses(self):
-        try:
-            courses = self.api.get_course_list()
-            if courses:
-                self._courses = courses
-                names = [c["CourseName"] for c in courses]
-                self._spinner.values = names
-                self._spinner.text = names[0]
-                self._selected_course = courses[0]
-                self._log("info", f"已加载 {len(courses)} 门课程")
-            else:
-                self._log("warn", "未获取到课程")
-        except Exception as e:
-            self._log("error", str(e))
-
-    def _on_course_select(self, spinner, text):
-        for c in self._courses:
-            if c["CourseName"] == text:
-                self._selected_course = c
-                return
-
-    # ─── 监控 ──────────────────────────────────────────────
-
-    def _toggle(self):
-        if self._monitoring:
-            self._stop()
+def course_labels(courses):
+    """Return stable unique labels while preserving the incoming course order."""
+    names = [str(course.get("CourseName") or "Unnamed course") for course in courses]
+    reserved = set(names)
+    seen = Counter()
+    used = set()
+    labels = []
+    for name in names:
+        seen[name] += 1
+        if seen[name] == 1 and name not in used:
+            label = name
         else:
-            self._start()
+            suffix = max(2, seen[name])
+            label = f"{name} ({suffix})"
+            while label in used or label in reserved:
+                suffix += 1
+                label = f"{name} ({suffix})"
+        used.add(label)
+        labels.append(label)
+    return labels
 
-    def _start(self):
-        if not self._selected_course:
-            self._log("warn", "请先登录并选择课程")
+
+def service_argument_json(cookie, course, countdown=DEFAULT_COUNTDOWN):
+    """Serialize the exact foreground-service monitor configuration."""
+    config = {
+        "cookie": str(cookie),
+        "course_id": str(course["CourseID"]),
+        "class_id": str(course["TClassID"]),
+        "class_name": str(course["CourseName"]),
+        "countdown": normalize_countdown(countdown),
+    }
+    return json.dumps(config, ensure_ascii=False, separators=(",", ":"))
+
+
+def start_daemon_worker(target, *args, name="activity-worker", **kwargs):
+    """Start background work without allowing it to keep the activity alive."""
+    worker = threading.Thread(
+        target=target,
+        args=args,
+        kwargs=kwargs,
+        name=name,
+        daemon=True,
+    )
+    worker.start()
+    return worker
+
+
+def vertical_stack_height(child_heights, spacing=7, padding=10):
+    """Return a fixed vertical layout height without clipping its children."""
+    heights = list(child_heights)
+    gaps = max(0, len(heights) - 1)
+    return sum(heights) + gaps * spacing + padding * 2
+
+
+try:
+    from kivy.app import App
+    from kivy.clock import Clock, mainthread
+    from kivy.graphics import Color, RoundedRectangle
+    from kivy.metrics import dp
+    from kivy.uix.boxlayout import BoxLayout
+    from kivy.uix.button import Button
+    from kivy.uix.label import Label
+    from kivy.uix.scrollview import ScrollView
+    from kivy.uix.spinner import Spinner
+    from kivy.uix.textinput import TextInput
+    from kivy.utils import escape_markup, platform
+
+    KIVY_AVAILABLE = True
+except ModuleNotFoundError as exc:
+    if not (exc.name or "").startswith("kivy"):
+        raise
+    KIVY_AVAILABLE = False
+
+
+class AndroidServiceBridge:
+    """Control p4a's generated service class from the visible activity."""
+
+    REQUEST_CODE = 4105
+
+    @staticmethod
+    def _android_runtime():
+        from jnius import autoclass
+
+        activity = autoclass("org.kivy.android.PythonActivity").mActivity
+        service = autoclass(SERVICE_CLASS)
+        sdk_int = autoclass("android.os.Build$VERSION").SDK_INT
+        return activity, service, sdk_int
+
+    def start(self, argument, callback):
+        if not KIVY_AVAILABLE or platform != "android":
+            callback(False, "Foreground monitoring is available on Android only.")
             return
-
         try:
-            cd = int(self._cd_input.text)
-        except ValueError:
-            cd = 10
+            activity, service, sdk_int = self._android_runtime()
+            if sdk_int >= 33:
+                from android.permissions import (
+                    Permission,
+                    check_permission,
+                    request_permissions,
+                )
 
-        self._log_label.text = ""
-        self._btn_start.disabled = True
-        self._btn_start.background_color = C_DISABLED
-        _draw_round_rect(self._btn_start)
-        self._btn_stop.disabled = False
-        self._btn_stop.background_color = C_RED
-        _draw_round_rect(self._btn_stop)
-        self._monitoring = True
+                permission = Permission.POST_NOTIFICATIONS
+                if not check_permission(permission):
+                    def permission_result(_permissions, _grants):
+                        if check_permission(permission):
+                            self._start_generated(service, activity, argument, callback)
+                        else:
+                            callback(False, "Notification permission is required.")
 
-        c = self._selected_course
-        self.svc.start(
-            course_id=c["CourseID"],
-            class_id=c["TClassID"],
-            class_name=c["CourseName"],
-            countdown=cd,
+                    request_permissions([permission], permission_result)
+                    return
+            self._start_generated(service, activity, argument, callback)
+        except Exception as exc:
+            callback(False, f"Unable to start monitor: {exc}")
+
+    @staticmethod
+    def _start_generated(service, activity, argument, callback):
+        try:
+            service.start(activity, argument)
+        except Exception as exc:
+            callback(False, f"Unable to start monitor: {exc}")
+            return
+        callback(True, "Monitoring started.")
+
+    def stop(self, callback):
+        if not KIVY_AVAILABLE or platform != "android":
+            callback(False, "Foreground monitoring is available on Android only.")
+            return
+        try:
+            activity, service, _sdk_int = self._android_runtime()
+            service.stop(activity)
+        except Exception as exc:
+            callback(False, f"Unable to stop monitor: {exc}")
+            return
+        callback(True, "Monitoring stopped.")
+
+
+if KIVY_AVAILABLE:
+    C_BG = (0.95, 0.96, 0.97, 1)
+    C_CARD = (1, 1, 1, 1)
+    C_PRIMARY = (0.12, 0.42, 0.82, 1)
+    C_DANGER = (0.82, 0.20, 0.18, 1)
+    C_TEXT = (0.10, 0.12, 0.15, 1)
+    C_MUTED = (0.40, 0.44, 0.50, 1)
+    C_SUCCESS = (0.12, 0.58, 0.34, 1)
+    C_WARNING = (0.88, 0.50, 0.08, 1)
+    C_DISABLED = (0.67, 0.69, 0.72, 1)
+
+    def _paint(widget, color, radius=8):
+        widget.canvas.before.clear()
+        with widget.canvas.before:
+            Color(*color)
+            RoundedRectangle(pos=widget.pos, size=widget.size, radius=[dp(radius)])
+
+    def _card(height=None):
+        card = BoxLayout(
+            orientation="vertical",
+            padding=dp(10),
+            spacing=dp(7),
+            size_hint_y=None if height else 1,
+            height=dp(height) if height else 100,
+        )
+        card.bind(pos=lambda widget, _value: _paint(widget, C_CARD))
+        card.bind(size=lambda widget, _value: _paint(widget, C_CARD))
+        return card
+
+    def _button(text, color=C_PRIMARY):
+        button = Button(
+            text=text,
+            bold=True,
+            font_size=dp(14),
+            size_hint_y=None,
+            height=dp(42),
+            background_normal="",
+            background_down="",
+            background_color=color,
+            color=(1, 1, 1, 1),
+        )
+        return button
+
+    def _input(**kwargs):
+        return TextInput(
+            multiline=False,
+            font_size=dp(14),
+            size_hint_y=None,
+            height=dp(42),
+            padding=[dp(10), dp(10), dp(10), dp(8)],
+            background_normal="",
+            background_active="",
+            background_color=(0.96, 0.97, 0.98, 1),
+            foreground_color=C_TEXT,
+            hint_text_color=C_MUTED,
+            cursor_color=C_PRIMARY,
+            **kwargs,
         )
 
-    def _stop(self):
-        self.svc.stop()
-        self._monitoring = False
-        self._btn_start.disabled = False
-        self._btn_start.background_color = C1
-        _draw_round_rect(self._btn_start)
-        self._btn_stop.disabled = True
-        self._btn_stop.background_color = C_DISABLED
-        _draw_round_rect(self._btn_stop)
 
-    def _on_status(self, running: bool):
-        if not running:
+    class SignPanel(BoxLayout):
+        EVENT_INTERVAL = 1.0
+
+        def __init__(
+            self,
+            base_dir,
+            api_factory=ApiClient,
+            service_bridge=None,
+            auto_restore=True,
+            **kwargs,
+        ):
+            super().__init__(**kwargs)
+            self.orientation = "vertical"
+            self.padding = [dp(12), dp(9)]
+            self.spacing = dp(8)
+            self.api_factory = api_factory
+            self.bridge = service_bridge or AndroidServiceBridge()
+            self.session_store = SessionStore(base_dir)
+            self.service_state = ServiceState(base_dir)
+            self.api = None
+            self._courses = []
+            self._course_by_label = {}
+            self._selected_course = None
+            self._auth_busy = False
+            self._service_busy = False
             self._monitoring = False
-            self._btn_start.disabled = False
-            self._btn_start.background_color = C1
-            _draw_round_rect(self._btn_start)
-            self._btn_stop.disabled = True
-            self._btn_stop.background_color = C_DISABLED
-            _draw_round_rect(self._btn_stop)
+            self._visible = False
+            self._event_timer = None
+            self._event_count = 0
+            self.bind(pos=lambda widget, _value: _paint(widget, C_BG, 0))
+            self.bind(size=lambda widget, _value: _paint(widget, C_BG, 0))
+            self._build()
+            self._sync_controls()
+            if auto_restore:
+                self._begin_restore()
 
-    # ─── 日志 ──────────────────────────────────────────────
+        def _build(self):
+            header = BoxLayout(size_hint_y=None, height=dp(38), spacing=dp(8))
+            title = Label(
+                text="对分易签到",
+                bold=True,
+                font_size=dp(20),
+                color=C_TEXT,
+                halign="left",
+                valign="middle",
+            )
+            title.bind(size=lambda widget, value: setattr(widget, "text_size", value))
+            self.status_badge = Label(
+                text="未登录",
+                bold=True,
+                font_size=dp(12),
+                color=C_MUTED,
+                size_hint_x=None,
+                width=dp(86),
+            )
+            header.add_widget(title)
+            header.add_widget(self.status_badge)
+            self.add_widget(header)
 
-    LOG_COLORS = {
-        "info":    "7F8C8D",
-        "success": "27AE60",
-        "error":   "E74C3C",
-        "warn":    "F39C12",
-    }
-    LOG_ICONS = {
-        "info":    "i",
-        "success": "✔",
-        "error":   "✘",
-        "warn":    "!",
-    }
+            auth_card = _card(vertical_stack_height([18, 42, 42]))
+            auth_card.add_widget(Label(
+                text="微信 OAuth 链接",
+                bold=True,
+                font_size=dp(13),
+                color=C_TEXT,
+                size_hint_y=None,
+                height=dp(18),
+                halign="left",
+            ))
+            self.oauth_input = _input(hint_text="粘贴包含 code 参数的授权链接")
+            self.oauth_button = _button("登录并加载课程")
+            self.oauth_button.bind(on_press=self._on_login_press)
+            auth_card.add_widget(self.oauth_input)
+            auth_card.add_widget(self.oauth_button)
+            self.add_widget(auth_card)
 
-    @mainthread
-    def _on_log(self, level: str, message: str):
-        now = datetime.datetime.now().strftime("%H:%M:%S")
-        color = self.LOG_COLORS.get(level, "7F8C8D")
-        icon = self.LOG_ICONS.get(level, "")
-        text = self._log_label.text
-        text += f"\n[color=#{color}][b]{icon}[/b] [{now}][/color] {message}"
-        if len(text) > 6000:
-            text = text[-5000:]
-        self._log_label.text = text
+            control_card = _card(vertical_stack_height([42, 42]))
+            row = BoxLayout(size_hint_y=None, height=dp(42), spacing=dp(7))
+            self.course_spinner = Spinner(
+                text="登录后选择课程",
+                values=(),
+                font_size=dp(14),
+                size_hint_x=0.72,
+                background_normal="",
+                background_color=(0.96, 0.97, 0.98, 1),
+                color=C_TEXT,
+            )
+            self.course_spinner.bind(text=self._on_course_select)
+            self.countdown_input = _input(text=str(DEFAULT_COUNTDOWN), input_filter="int")
+            self.countdown_input.size_hint_x = 0.28
+            row.add_widget(self.course_spinner)
+            row.add_widget(self.countdown_input)
+            self.monitor_button = _button("开始监控")
+            self.monitor_button.bind(on_press=self._on_monitor_press)
+            control_card.add_widget(row)
+            control_card.add_widget(self.monitor_button)
+            self.add_widget(control_card)
 
-    def _log(self, level: str, message: str):
-        self._on_log(level, message)
+            log_card = _card()
+            log_card.add_widget(Label(
+                text="运行记录",
+                bold=True,
+                font_size=dp(13),
+                color=C_TEXT,
+                size_hint_y=None,
+                height=dp(20),
+                halign="left",
+            ))
+            scroll = ScrollView(do_scroll_x=False)
+            self.log_label = Label(
+                text="",
+                markup=True,
+                font_size=dp(12),
+                color=C_TEXT,
+                size_hint_y=None,
+                valign="top",
+                halign="left",
+                padding=[dp(2), dp(3)],
+            )
+            self.log_label.bind(width=lambda widget, value: setattr(widget, "text_size", (value, None)))
+            self.log_label.bind(texture_size=lambda widget, value: setattr(widget, "height", value[1]))
+            scroll.add_widget(self.log_label)
+            log_card.add_widget(scroll)
+            self.add_widget(log_card)
 
+        def _schedule(self, callback, *args):
+            Clock.schedule_once(lambda _dt: callback(*args), 0)
 
-# ── app ────────────────────────────────────────────────────
+        def _begin_restore(self):
+            self._set_auth_busy(True, "恢复登录中")
+            start_daemon_worker(self._restore_worker, name="restore-session")
 
-class SignApp(App):
-    def _setup_font(self):
-        import os as _os
-        for _p in [
-            "/system/fonts/NotoSansCJK-Regular.ttc",
-            "/system/fonts/DroidSansFallback.ttf",
-            "/system/fonts/NotoSansSC-Regular.otf",
-            "/system/fonts/MiSans-Regular.ttf",
-            "/system/fonts/HarmonyOS_Sans_SC_Regular.ttf",
-        ]:
-            if _os.path.exists(_p):
-                from kivy.core.text import LabelBase
-                try:
-                    LabelBase.register(name="Roboto", fn_regular=_p)
-                except Exception:
-                    pass
+        def _restore_worker(self):
+            cookie = self.session_store.load_cookie()
+            if not cookie:
+                self._schedule(self._finish_restore, None, [], "", False)
                 return
+            try:
+                api = self.api_factory(cookie)
+                if not api.check_login():
+                    self.session_store.clear()
+                    self._schedule(self._finish_restore, None, [], "登录已失效，请重新授权。", True)
+                    return
+                courses = api.get_course_list()
+            except Exception as exc:
+                self._schedule(self._finish_restore, None, [], f"恢复登录失败: {exc}", False)
+                return
+            self._schedule(self._finish_restore, api, courses, "已恢复登录。", False)
 
-    def build(self):
-        if platform == "android":
-            self._setup_font()
-        self.title = "对分易自动签到"
-        return SignPanel()
+        @mainthread
+        def _finish_restore(self, api, courses, message, invalid_cookie):
+            self.api = api
+            self._set_auth_busy(False)
+            self._apply_courses(courses)
+            if message:
+                self._append_log("warn" if invalid_cookie else "info", message)
+            self._restore_monitoring_state()
+
+        def _on_login_press(self, _button):
+            link = self.oauth_input.text.strip()
+            if not link:
+                self._append_log("warn", "请粘贴微信 OAuth 链接。")
+                return
+            self._set_auth_busy(True, "登录中")
+            start_daemon_worker(self._login_worker, link, name="oauth-login")
+
+        def _login_worker(self, link):
+            try:
+                api = self.api_factory()
+                message = api.login_by_wechat_link(link)
+                if not api.check_login():
+                    self._schedule(self._finish_login, None, [], str(message), False)
+                    return
+                self.session_store.save_cookie(api.export_cookie())
+                courses = api.get_course_list()
+            except Exception as exc:
+                self._schedule(self._finish_login, None, [], f"登录失败: {exc}", False)
+                return
+            self._schedule(self._finish_login, api, courses, str(message), True)
+
+        @mainthread
+        def _finish_login(self, api, courses, message, success):
+            self.api = api if success else None
+            self._set_auth_busy(False)
+            self._apply_courses(courses)
+            self._append_log("success" if success else "error", message)
+
+        @mainthread
+        def _apply_courses(self, courses):
+            self._courses = list(courses or [])
+            labels = course_labels(self._courses)
+            self._course_by_label = dict(zip(labels, self._courses))
+            self.course_spinner.values = labels
+            if labels:
+                configured = self.service_state.read_config() or {}
+                configured_id = str(configured.get("course_id", ""))
+                selected_label = next(
+                    (
+                        label for label, course in self._course_by_label.items()
+                        if str(course.get("CourseID", "")) == configured_id
+                    ),
+                    labels[0],
+                )
+                self.course_spinner.text = selected_label
+                self._selected_course = self._course_by_label[selected_label]
+            else:
+                self.course_spinner.text = "暂无课程" if self.api else "登录后选择课程"
+                self._selected_course = None
+            self._sync_controls()
+
+        def _on_course_select(self, _spinner, label):
+            self._selected_course = self._course_by_label.get(label)
+            self._sync_controls()
+
+        def _on_monitor_press(self, _button):
+            if self._service_busy:
+                return
+            if self._monitoring:
+                self._stop_monitoring()
+            else:
+                self._start_monitoring()
+
+        def _start_monitoring(self):
+            if self.api is None or self._selected_course is None:
+                self._append_log("warn", "请先登录并选择课程。")
+                return
+            cookie = self.api.export_cookie()
+            argument = service_argument_json(cookie, self._selected_course, self.countdown_input.text)
+            self.service_state.write_config(json.loads(argument))
+            self._set_service_busy(True, "启动中")
+            self.bridge.start(
+                argument,
+                lambda success, message: self._schedule(
+                    self._finish_service_start, success, message
+                ),
+            )
+
+        @mainthread
+        def _finish_service_start(self, success, message):
+            self._monitoring = bool(success)
+            if not success:
+                self.service_state.request_stop()
+            self._set_service_busy(False)
+            self._append_log("success" if success else "error", message)
+
+        def _stop_monitoring(self):
+            self.service_state.request_stop()
+            self._monitoring = False
+            self._set_service_busy(True, "停止中")
+            self.bridge.stop(
+                lambda success, message: self._schedule(
+                    self._finish_service_stop, success, message
+                )
+            )
+
+        @mainthread
+        def _finish_service_stop(self, success, message):
+            self._monitoring = False
+            self._set_service_busy(False)
+            self._append_log("info" if success else "warn", message)
+
+        @mainthread
+        def _set_auth_busy(self, busy, status=None):
+            self._auth_busy = bool(busy)
+            if status:
+                self.status_badge.text = status
+                self.status_badge.color = C_WARNING
+            self._sync_controls()
+
+        @mainthread
+        def _set_service_busy(self, busy, status=None):
+            self._service_busy = bool(busy)
+            if status:
+                self.status_badge.text = status
+                self.status_badge.color = C_WARNING
+            self._sync_controls()
+
+        def _sync_controls(self):
+            logged_in = self.api is not None
+            blocked = self._auth_busy or self._service_busy
+            self.oauth_input.disabled = blocked or self._monitoring
+            self.oauth_button.disabled = blocked or self._monitoring
+            self.course_spinner.disabled = blocked or self._monitoring or not self._courses
+            self.countdown_input.disabled = blocked or self._monitoring or not logged_in
+            self.monitor_button.disabled = blocked or (not self._monitoring and self._selected_course is None)
+            self.monitor_button.text = "停止监控" if self._monitoring else "开始监控"
+            self.monitor_button.background_color = C_DANGER if self._monitoring else C_PRIMARY
+            if blocked:
+                self.monitor_button.background_color = C_DISABLED
+            elif self._monitoring:
+                self.status_badge.text = "监控中"
+                self.status_badge.color = C_SUCCESS
+            elif logged_in:
+                self.status_badge.text = "已登录"
+                self.status_badge.color = C_PRIMARY
+            else:
+                self.status_badge.text = "未登录"
+                self.status_badge.color = C_MUTED
+
+        def on_visible(self):
+            self._visible = True
+            self._restore_monitoring_state()
+            self._poll_events(0)
+            if self._event_timer is None:
+                self._event_timer = Clock.schedule_interval(
+                    self._poll_events, self.EVENT_INTERVAL
+                )
+
+        def on_hidden(self):
+            self._visible = False
+            if self._event_timer is not None:
+                self._event_timer.cancel()
+                self._event_timer = None
+
+        @mainthread
+        def _restore_monitoring_state(self):
+            config = self.service_state.read_config()
+            running = bool(config) and not self.service_state.stop_requested()
+            for event in reversed(self.service_state.read_events()):
+                message = str(event.get("message", ""))
+                if message == "Monitoring started.":
+                    break
+                if (
+                    message == "Monitoring stopped."
+                    or "stopped" in message.lower()
+                    or "failed" in message.lower()
+                    or "expired" in message.lower()
+                    or "unavailable" in message.lower()
+                ):
+                    running = False
+                    break
+            self._monitoring = running
+            self._sync_controls()
+
+        def _poll_events(self, _dt):
+            if not self._visible:
+                return False
+            events = self.service_state.read_events()
+            if self._event_count > len(events):
+                self._event_count = 0
+            for event in events[self._event_count:]:
+                self._append_log(
+                    str(event.get("level", "info")),
+                    str(event.get("message", "")),
+                    event.get("timestamp"),
+                )
+            self._event_count = len(events)
+            return True
+
+        @mainthread
+        def _append_log(self, level, message, timestamp=None):
+            colors = {
+                "info": "4B647A",
+                "success": "16834A",
+                "warn": "B56708",
+                "error": "B52822",
+            }
+            if timestamp is None:
+                moment = datetime.datetime.now()
+            else:
+                try:
+                    moment = datetime.datetime.fromtimestamp(float(timestamp))
+                except (TypeError, ValueError, OSError):
+                    moment = datetime.datetime.now()
+            line = (
+                f"[color=#{colors.get(level, '4B647A')}]"
+                f"[{moment:%H:%M:%S}][/color] {escape_markup(str(message))}"
+            )
+            lines = (self.log_label.text.splitlines() + [line])[-160:]
+            self.log_label.text = "\n".join(lines)
+
+
+    class SignApp(App):
+        def build(self):
+            self.title = "对分易签到"
+            self.panel = SignPanel(base_dir=self.user_data_dir)
+            Clock.schedule_once(lambda _dt: self.panel.on_visible(), 0)
+            return self.panel
+
+        def on_pause(self):
+            self.panel.on_hidden()
+            return True
+
+        def on_resume(self):
+            self.panel.on_visible()
+
+        def on_stop(self):
+            self.panel.on_hidden()
+
+
+else:
+    class SignPanel:
+        def __init__(self, *args, **kwargs):
+            raise RuntimeError("Kivy is required to construct SignPanel")
+
+
+    class SignApp:
+        def run(self):
+            raise RuntimeError("Kivy is required to run SignApp")
 
 
 if __name__ == "__main__":

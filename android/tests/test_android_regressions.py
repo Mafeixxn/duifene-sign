@@ -1,6 +1,9 @@
 import configparser
+import importlib
+import inspect
 import json
 import tempfile
+import threading
 import unittest
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
@@ -439,6 +442,108 @@ class ForegroundServiceTests(unittest.TestCase):
             )
 
             self.assertEqual(state.read_events()[-1]["level"], "error")
+
+
+class ActivityUiTests(unittest.TestCase):
+    @staticmethod
+    def _activity_module():
+        return importlib.import_module("android.main")
+
+    def test_countdown_helper_returns_nonnegative_integer(self):
+        normalize_countdown = self._activity_module().normalize_countdown
+
+        self.assertEqual(normalize_countdown("25"), 25)
+        self.assertEqual(normalize_countdown("-4"), 0)
+        self.assertEqual(normalize_countdown(""), 10)
+        self.assertEqual(normalize_countdown("not-a-number"), 10)
+        self.assertEqual(normalize_countdown(None, default=3), 3)
+
+    def test_duplicate_course_labels_are_unique_and_stable(self):
+        course_labels = self._activity_module().course_labels
+        courses = [
+            {"CourseName": "Physics"},
+            {"CourseName": "Physics"},
+            {"CourseName": "Chemistry"},
+            {"CourseName": "Physics"},
+        ]
+
+        self.assertEqual(
+            course_labels(courses),
+            ["Physics", "Physics (2)", "Chemistry", "Physics (3)"],
+        )
+        self.assertEqual(
+            course_labels([
+                {"CourseName": "Physics"},
+                {"CourseName": "Physics"},
+                {"CourseName": "Physics (2)"},
+            ]),
+            ["Physics", "Physics (3)", "Physics (2)"],
+        )
+
+    def test_service_argument_json_contains_normalized_monitor_config(self):
+        service_argument_json = self._activity_module().service_argument_json
+        course = {"CourseID": 12, "TClassID": 34, "CourseName": "Physics"}
+
+        payload = service_argument_json("sid=test", course, "-2")
+
+        self.assertEqual(
+            json.loads(payload),
+            {
+                "cookie": "sid=test",
+                "course_id": "12",
+                "class_id": "34",
+                "class_name": "Physics",
+                "countdown": 0,
+            },
+        )
+        self.assertNotIn(" ", payload)
+
+    def test_worker_helper_starts_daemon_thread(self):
+        start_daemon_worker = self._activity_module().start_daemon_worker
+        completed = threading.Event()
+
+        worker = start_daemon_worker(completed.set, name="activity-test")
+
+        self.assertTrue(worker.daemon)
+        self.assertEqual(worker.name, "activity-test")
+        self.assertTrue(completed.wait(1))
+        worker.join(1)
+
+    def test_vertical_stack_height_includes_children_spacing_and_padding(self):
+        vertical_stack_height = self._activity_module().vertical_stack_height
+
+        self.assertEqual(vertical_stack_height([18, 42, 42]), 136)
+        self.assertEqual(vertical_stack_height([42, 42]), 111)
+        self.assertEqual(vertical_stack_height([]), 20)
+
+    def test_activity_module_is_desktop_importable_without_kivy(self):
+        module = self._activity_module()
+
+        self.assertIsInstance(module.KIVY_AVAILABLE, bool)
+        self.assertTrue(callable(module.normalize_countdown))
+
+    def test_activity_source_has_no_password_login_surface(self):
+        source = inspect.getsource(self._activity_module()).lower()
+
+        self.assertNotIn("login_by_password", source)
+        self.assertNotIn("password=true", source.replace(" ", ""))
+        self.assertNotIn("_pwd", source)
+
+    def test_sign_panel_smoke_has_no_password_widgets_when_kivy_is_available(self):
+        module = self._activity_module()
+        if not module.KIVY_AVAILABLE:
+            self.skipTest("Kivy is not installed on this host")
+
+        with tempfile.TemporaryDirectory() as base_dir:
+            panel = module.SignPanel(base_dir=base_dir, auto_restore=False)
+            visible_copy = " ".join(
+                str(getattr(widget, attribute, ""))
+                for widget in panel.walk()
+                for attribute in ("text", "hint_text")
+            ).lower()
+
+        self.assertNotIn("password", visible_copy)
+        self.assertNotIn("密码", visible_copy)
 
 if __name__ == "__main__":
     unittest.main()
