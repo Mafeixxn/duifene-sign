@@ -321,6 +321,21 @@ class PrivateStorageTests(unittest.TestCase):
         self.assertEqual(events[0], {"index": 2})
         self.assertEqual(events[-1], {"index": state.MAX_EVENT_LINES + 1})
 
+    def test_event_log_retains_json_strings_with_unicode_line_separators(self):
+        state = ServiceState(self.base_dir)
+        message = "first\u0085second"
+        for index in range(state.MAX_EVENT_LINES + 1):
+            event = {"index": index}
+            if index == 1:
+                event["message"] = message
+            state.append_event(event)
+
+        events = state.read_events()
+
+        self.assertEqual(len(events), state.MAX_EVENT_LINES)
+        self.assertEqual(events[0], {"index": 1, "message": message})
+        self.assertEqual(events[-1], {"index": state.MAX_EVENT_LINES})
+
     def test_event_log_recovers_from_invalid_utf8_before_bounded_retention(self):
         state = ServiceState(self.base_dir)
         state.events_path.write_bytes(b'{"corrupt":"\xff"}\n')

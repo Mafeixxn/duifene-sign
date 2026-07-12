@@ -61,12 +61,15 @@ class ServiceState:
             raise TypeError("event must be a mapping")
         line = json.dumps(dict(event), ensure_ascii=False, separators=(",", ":")) + "\n"
         try:
-            existing_lines = self.events_path.read_text(encoding="utf-8").splitlines()
+            existing_lines = self.events_path.read_text(encoding="utf-8").split("\n")
         except FileNotFoundError:
             existing_lines = []
         except UnicodeError:
             self._replace_text(self.events_path, line)
             return
+
+        if existing_lines and existing_lines[-1] == "":
+            existing_lines.pop()
 
         if len(existing_lines) >= self.MAX_EVENT_LINES:
             retained_lines = existing_lines[-(self.MAX_EVENT_LINES - 1):]
@@ -81,7 +84,7 @@ class ServiceState:
     def read_events(self):
         """Return well-formed object events, skipping incomplete or malformed lines."""
         try:
-            lines = self.events_path.read_text(encoding="utf-8").splitlines()
+            lines = self.events_path.read_text(encoding="utf-8").split("\n")
         except (FileNotFoundError, OSError, UnicodeError):
             return []
 

@@ -161,3 +161,49 @@ PYTHONDONTWRITEBYTECODE=1 python -m unittest \
 Ran 22 tests in 0.364s
 OK
 ```
+
+## P2 JSONL Line-Separator Follow-up
+
+### RED
+
+Added a regression that writes an event containing the valid JSON string value
+`"first\u0085second"`, then appends 201 events total. The event with U+0085
+must remain readable in the retained 200-event window.
+
+Ran:
+
+```text
+PYTHONDONTWRITEBYTECODE=1 python -m unittest \
+  android.tests.test_android_regressions.PrivateStorageTests -v
+```
+
+The new test failed before the implementation change:
+
+```text
+FAIL: test_event_log_retains_json_strings_with_unicode_line_separators
+AssertionError: 199 != 200
+```
+
+### GREEN
+
+Event JSONL parsing and retention now split only on literal `"\n"`. Retention
+removes a terminal LF separator before counting records; event readers retain
+their existing malformed-line tolerance.
+
+Focused storage/IPC verification:
+
+```text
+PYTHONDONTWRITEBYTECODE=1 python -m unittest \
+  android.tests.test_android_regressions.PrivateStorageTests -v
+Ran 10 tests in 0.458s
+OK
+```
+
+Full Android regression verification:
+
+```text
+PYTHONDONTWRITEBYTECODE=1 python -m unittest \
+  android.tests.test_android_regressions -v
+Ran 23 tests in 1.581s
+OK
+```
