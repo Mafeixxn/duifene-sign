@@ -1,4 +1,5 @@
 import configparser
+import datetime
 import importlib
 import inspect
 import json
@@ -515,6 +516,90 @@ class ActivityUiTests(unittest.TestCase):
         self.assertEqual(vertical_stack_height([18, 42, 42]), 136)
         self.assertEqual(vertical_stack_height([42, 42]), 111)
         self.assertEqual(vertical_stack_height([]), 20)
+
+    def test_monitoring_state_uses_only_explicit_service_lifecycle_messages(self):
+        module = self._activity_module()
+        stopped_messages = (
+            "Monitoring stopped.",
+            "Monitoring stopped before service startup.",
+            "Monitoring configuration is unavailable.",
+            "Monitoring service failed: boom",
+        )
+
+        self.assertTrue(module.lifecycle_monitoring_state("Monitoring started."))
+        for message in stopped_messages:
+            with self.subTest(message=message):
+                self.assertFalse(module.lifecycle_monitoring_state(message))
+        for message in (
+            "Polling request failed: timed out",
+            "Session expired while polling; retrying.",
+            "Course unavailable; polling continues.",
+            "Worker stopped responding briefly.",
+        ):
+            with self.subTest(message=message):
+                self.assertIsNone(module.lifecycle_monitoring_state(message))
+
+    def test_restored_monitoring_state_ignores_transient_failures(self):
+        restored_monitoring_state = self._activity_module().restored_monitoring_state
+        events = [
+            {"message": "Monitoring started."},
+            {"message": "Polling request failed: timed out"},
+        ]
+
+        self.assertTrue(restored_monitoring_state(True, False, events))
+        events.append({"message": "Monitoring configuration is unavailable."})
+        self.assertFalse(restored_monitoring_state(True, False, events))
+
+    def test_polled_lifecycle_events_update_monitoring_state_immediately(self):
+        apply_lifecycle_events = self._activity_module().apply_lifecycle_events
+
+        self.assertFalse(apply_lifecycle_events(True, [
+            {"message": "Monitoring stopped before service startup."},
+        ]))
+        self.assertFalse(apply_lifecycle_events(True, [
+            {"message": "Monitoring service failed: broken config"},
+        ]))
+        self.assertTrue(apply_lifecycle_events(False, [
+            {"message": "Monitoring started."},
+        ]))
+
+    def test_event_identity_tracker_survives_rollover_and_pause_with_bounded_memory(self):
+        module = self._activity_module()
+        tracker = module.EventIdentityTracker(max_seen=400)
+        initial = [
+            {"timestamp": index, "level": "info", "message": f"event {index}"}
+            for index in range(200)
+        ]
+
+        self.assertEqual(tracker.unseen(initial), initial)
+        rolled = initial[1:] + [
+            {"timestamp": 200, "level": "info", "message": "event 200"},
+        ]
+        self.assertEqual(tracker.unseen(rolled), [rolled[-1]])
+
+        after_pause = [
+            {"timestamp": index, "level": "info", "message": f"event {index}"}
+            for index in range(201, 401)
+        ]
+        self.assertEqual(tracker.unseen(after_pause), after_pause)
+        self.assertLessEqual(tracker.seen_count, 400)
+
+    def test_event_identity_uses_timestamp_level_and_message(self):
+        tracker = self._activity_module().EventIdentityTracker(max_seen=10)
+        events = [
+            {"timestamp": 1, "level": "info", "message": "same"},
+            {"timestamp": 1, "level": "warn", "message": "same"},
+            {"timestamp": 2, "level": "info", "message": "same"},
+        ]
+
+        self.assertEqual(tracker.unseen(events), events)
+        self.assertEqual(tracker.unseen(events), [])
+
+    def test_malformed_overflow_timestamp_uses_current_time_fallback(self):
+        event_moment = self._activity_module().event_moment
+        fallback = datetime.datetime(2026, 7, 12, 8, 30, 0)
+
+        self.assertEqual(event_moment("1e309", now=lambda: fallback), fallback)
 
     def test_activity_module_is_desktop_importable_without_kivy(self):
         module = self._activity_module()

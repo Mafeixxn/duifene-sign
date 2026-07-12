@@ -3,7 +3,7 @@
 import datetime
 import json
 import threading
-from collections import Counter
+from collections import Counter, deque
 
 try:
     from .api_client import ApiClient
@@ -83,6 +83,78 @@ def vertical_stack_height(child_heights, spacing=7, padding=10):
     heights = list(child_heights)
     gaps = max(0, len(heights) - 1)
     return sum(heights) + gaps * spacing + padding * 2
+
+
+def lifecycle_monitoring_state(message):
+    """Return the monitoring state represented by an explicit lifecycle message."""
+    message = str(message)
+    if message == "Monitoring started.":
+        return True
+    if message in {
+        "Monitoring stopped.",
+        "Monitoring stopped before service startup.",
+        "Monitoring configuration is unavailable.",
+    } or message.startswith("Monitoring service failed:"):
+        return False
+    return None
+
+
+def apply_lifecycle_events(monitoring, events):
+    """Apply lifecycle events in emission order and return the resulting state."""
+    monitoring = bool(monitoring)
+    for event in events:
+        state = lifecycle_monitoring_state(event.get("message", ""))
+        if state is not None:
+            monitoring = state
+    return monitoring
+
+
+def restored_monitoring_state(config_available, stop_requested, events):
+    """Infer service state without allowing stale events to revive invalid config."""
+    monitoring = bool(config_available) and not bool(stop_requested)
+    if not monitoring:
+        return False
+    return apply_lifecycle_events(monitoring, events)
+
+
+class EventIdentityTracker:
+    """Deduplicate retained service events by their stable serialized identity."""
+
+    def __init__(self, max_seen=400):
+        self.max_seen = max(1, int(max_seen))
+        self._order = deque()
+        self._seen = set()
+
+    @staticmethod
+    def identity(event):
+        return tuple(str(event.get(field, "")) for field in ("timestamp", "level", "message"))
+
+    @property
+    def seen_count(self):
+        return len(self._seen)
+
+    def unseen(self, events):
+        unseen_events = []
+        for event in events:
+            identity = self.identity(event)
+            if identity in self._seen:
+                continue
+            self._seen.add(identity)
+            self._order.append(identity)
+            unseen_events.append(event)
+            while len(self._order) > self.max_seen:
+                self._seen.remove(self._order.popleft())
+        return unseen_events
+
+
+def event_moment(timestamp, now=datetime.datetime.now):
+    """Convert a service timestamp, falling back safely for malformed values."""
+    if timestamp is not None:
+        try:
+            return datetime.datetime.fromtimestamp(float(timestamp))
+        except (TypeError, ValueError, OverflowError, OSError):
+            pass
+    return now()
 
 
 try:
@@ -256,7 +328,7 @@ if KIVY_AVAILABLE:
             self._monitoring = False
             self._visible = False
             self._event_timer = None
-            self._event_count = 0
+            self._event_tracker = EventIdentityTracker()
             self.bind(pos=lambda widget, _value: _paint(widget, C_BG, 0))
             self.bind(size=lambda widget, _value: _paint(widget, C_BG, 0))
             self._build()
@@ -545,36 +617,32 @@ if KIVY_AVAILABLE:
         @mainthread
         def _restore_monitoring_state(self):
             config = self.service_state.read_config()
-            running = bool(config) and not self.service_state.stop_requested()
-            for event in reversed(self.service_state.read_events()):
-                message = str(event.get("message", ""))
-                if message == "Monitoring started.":
-                    break
-                if (
-                    message == "Monitoring stopped."
-                    or "stopped" in message.lower()
-                    or "failed" in message.lower()
-                    or "expired" in message.lower()
-                    or "unavailable" in message.lower()
-                ):
-                    running = False
-                    break
-            self._monitoring = running
+            self._monitoring = restored_monitoring_state(
+                bool(config),
+                self.service_state.stop_requested(),
+                self.service_state.read_events(),
+            )
             self._sync_controls()
 
         def _poll_events(self, _dt):
             if not self._visible:
                 return False
             events = self.service_state.read_events()
-            if self._event_count > len(events):
-                self._event_count = 0
-            for event in events[self._event_count:]:
+            new_events = self._event_tracker.unseen(events)
+            lifecycle_seen = False
+            for event in new_events:
                 self._append_log(
                     str(event.get("level", "info")),
                     str(event.get("message", "")),
                     event.get("timestamp"),
                 )
-            self._event_count = len(events)
+                state = lifecycle_monitoring_state(event.get("message", ""))
+                if state is not None:
+                    self._monitoring = state
+                    lifecycle_seen = True
+            if lifecycle_seen:
+                self._service_busy = False
+                self._sync_controls()
             return True
 
         @mainthread
@@ -585,13 +653,7 @@ if KIVY_AVAILABLE:
                 "warn": "B56708",
                 "error": "B52822",
             }
-            if timestamp is None:
-                moment = datetime.datetime.now()
-            else:
-                try:
-                    moment = datetime.datetime.fromtimestamp(float(timestamp))
-                except (TypeError, ValueError, OSError):
-                    moment = datetime.datetime.now()
+            moment = event_moment(timestamp)
             line = (
                 f"[color=#{colors.get(level, '4B647A')}]"
                 f"[{moment:%H:%M:%S}][/color] {escape_markup(str(message))}"
