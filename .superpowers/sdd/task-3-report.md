@@ -105,3 +105,59 @@ errors.
 The event log is designed for the planned single foreground-service writer and
 visible-activity reader. Concurrent event writers are outside this task's IPC
 contract and would require a cross-process lock to avoid lost rollover writes.
+
+## Review Follow-up Fixes
+
+### RED
+
+Added two regressions to `PrivateStorageTests` before changing the production
+code:
+
+1. A saved UTF-8 cookie with leading and trailing whitespace must load exactly
+   as written.
+2. A JSONL file beginning with invalid UTF-8 bytes must recover when valid
+   events are appended, and must still retain only the newest 200 events.
+
+Ran:
+
+```text
+PYTHONDONTWRITEBYTECODE=1 python -m unittest \
+  android.tests.test_android_regressions.PrivateStorageTests -v
+```
+
+The expected failures were observed:
+
+```text
+FAIL: test_cookie_round_trips_with_leading_and_trailing_whitespace
+AssertionError: 'session=...'
+             != ' \t session=... \n'
+
+FAIL: test_event_log_recovers_from_invalid_utf8_before_bounded_retention
+AssertionError: 0 != 200
+```
+
+### GREEN
+
+`SessionStore.load_cookie()` now returns successfully decoded text verbatim;
+missing, invalid, and genuinely empty files still produce the signed-out empty
+string. `ServiceState.append_event()` now atomically replaces an invalid UTF-8
+event file with the incoming valid JSONL line before later appends and normal
+retention resume.
+
+Focused storage/IPC verification:
+
+```text
+PYTHONDONTWRITEBYTECODE=1 python -m unittest \
+  android.tests.test_android_regressions.PrivateStorageTests -v
+Ran 9 tests in 0.372s
+OK
+```
+
+Full Android regression verification:
+
+```text
+PYTHONDONTWRITEBYTECODE=1 python -m unittest \
+  android.tests.test_android_regressions -v
+Ran 22 tests in 0.364s
+OK
+```

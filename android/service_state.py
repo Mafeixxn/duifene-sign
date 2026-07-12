@@ -62,8 +62,11 @@ class ServiceState:
         line = json.dumps(dict(event), ensure_ascii=False, separators=(",", ":")) + "\n"
         try:
             existing_lines = self.events_path.read_text(encoding="utf-8").splitlines()
-        except (FileNotFoundError, UnicodeError):
+        except FileNotFoundError:
             existing_lines = []
+        except UnicodeError:
+            self._replace_text(self.events_path, line)
+            return
 
         if len(existing_lines) >= self.MAX_EVENT_LINES:
             retained_lines = existing_lines[-(self.MAX_EVENT_LINES - 1):]

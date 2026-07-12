@@ -21,7 +21,7 @@ class SessionStore:
     def load_cookie(self):
         """Return an empty string when no valid saved session is available."""
         try:
-            return self.cookie_path.read_text(encoding="utf-8").strip()
+            return self.cookie_path.read_text(encoding="utf-8")
         except (OSError, UnicodeError):
             return ""
 

@@ -255,6 +255,14 @@ class PrivateStorageTests(unittest.TestCase):
 
         self.assertEqual(store.load_cookie(), cookie)
 
+    def test_cookie_round_trips_with_leading_and_trailing_whitespace(self):
+        store = SessionStore(self.base_dir)
+        cookie = " \t session=\u6d4b\u8bd5; name=\u771f\u5bfb \n"
+
+        store.save_cookie(cookie)
+
+        self.assertEqual(store.load_cookie(), cookie)
+
     def test_clear_removes_saved_cookie(self):
         store = SessionStore(self.base_dir)
         store.save_cookie("session=active")
@@ -304,6 +312,19 @@ class PrivateStorageTests(unittest.TestCase):
 
     def test_event_log_retains_only_the_most_recent_bounded_events(self):
         state = ServiceState(self.base_dir)
+        for index in range(state.MAX_EVENT_LINES + 2):
+            state.append_event({"index": index})
+
+        events = state.read_events()
+
+        self.assertEqual(len(events), state.MAX_EVENT_LINES)
+        self.assertEqual(events[0], {"index": 2})
+        self.assertEqual(events[-1], {"index": state.MAX_EVENT_LINES + 1})
+
+    def test_event_log_recovers_from_invalid_utf8_before_bounded_retention(self):
+        state = ServiceState(self.base_dir)
+        state.events_path.write_bytes(b'{"corrupt":"\xff"}\n')
+
         for index in range(state.MAX_EVENT_LINES + 2):
             state.append_event({"index": index})
 
