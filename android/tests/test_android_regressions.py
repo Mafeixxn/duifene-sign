@@ -245,6 +245,36 @@ class SignServiceTests(unittest.TestCase):
 
         self.assertEqual(self.api.code_signins, ["1234"])
 
+    def test_reports_activity_countdown_until_signin_threshold(self):
+        logs = []
+        self.service.on_log = lambda level, message: logs.append((level, message))
+        self.service.configure(
+            course_id=101,
+            class_id=7,
+            class_name="Physics",
+            countdown=10,
+        )
+        self.api.activities = [
+            {"type": "1", "checkin_id": "countdown", "class_ids": [7],
+             "seconds": str(seconds), "code": "1234"}
+            for seconds in (12, 11, 10)
+        ]
+
+        self.service.poll_once()
+        self.service.poll_once()
+        self.service.poll_once()
+
+        self.assertEqual(self.api.code_signins, ["1234"])
+        self.assertEqual(
+            logs,
+            [
+                ("info", "检测到签到码签到，剩余 12 秒，等待中。"),
+                ("info", "检测到签到码签到，剩余 11 秒，等待中。"),
+                ("info", "签到码签到剩余 10 秒，开始签到。"),
+                ("success", "签到成功"),
+            ],
+        )
+
     def test_uses_five_second_backoff_after_activity_timeout(self):
         self.api.activities = [TimeoutError("timed out")]
 

@@ -107,10 +107,26 @@ class SignService:
         except (TypeError, ValueError):
             self._emit_log("warn", "Ignored activity with invalid countdown.")
             return
-        if seconds > self._countdown:
-            return
 
         check_type = str(activity.get("type", ""))
+        type_name = {
+            "1": "签到码",
+            "2": "二维码",
+            "3": "定位",
+        }.get(check_type)
+        if type_name is None:
+            return
+        if seconds > self._countdown:
+            self._emit_log(
+                "info",
+                f"检测到{type_name}签到，剩余 {seconds} 秒，等待中。",
+            )
+            return
+
+        self._emit_log(
+            "info",
+            f"{type_name}签到剩余 {seconds} 秒，开始签到。",
+        )
         if check_type == "1":
             code = activity.get("code")
             if code is None:
