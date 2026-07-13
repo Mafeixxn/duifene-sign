@@ -22,12 +22,12 @@ https://github.com/kivy/python-for-android.git
 # Apache ANT found at /root/.buildozer/android/platform/apache-ant-1.9.4
 # Android SDK found at /root/.buildozer/android/platform/android-sdk
 # Recommended android's NDK version by p4a is: 28c
-# Android NDK found at /root/.buildozer/android/platform/android-ndk-r25b
-# Run '/opt/buildozer-venv/bin/python3 -m pythonforandroid.toolchain aab -h --color=always --storage-dir=/root/duifene-build-20260713/.buildozer/android/platform/build-arm64-v8a --ndk-api=29 --ignore-setup-py --debug' ...
+# Android NDK found at /root/.buildozer/android/platform/android-ndk-r28c
+# Run '/opt/buildozer-venv/bin/python3 -m pythonforandroid.toolchain aab -h --color=always --storage-dir=/root/duifene-build-20260713/.buildozer/android/platform/build-arm64-v8a --ndk-api=29 --hook=/root/duifene-build-20260713/p4a_hook.py --ignore-setup-py --debug' ...
 # Cwd /root/duifene-build-20260713/.buildozer/android/platform/python-for-android
 # Check application requirements
 # Compile platform
-# Run '/opt/buildozer-venv/bin/python3 -m pythonforandroid.toolchain create --dist_name=duifene_sign --bootstrap=sdl2 --requirements=python3,kivy==2.3.1,requests==2.34.2 --arch=arm64-v8a --copy-libs --color=always --storage-dir=/root/duifene-build-20260713/.buildozer/android/platform/build-arm64-v8a --ndk-api=29 --ignore-setup-py --debug' ...
+# Run '/opt/buildozer-venv/bin/python3 -m pythonforandroid.toolchain create --dist_name=duifene_sign --bootstrap=sdl2 --requirements=python3,kivy==2.3.1,requests==2.34.2 --arch=arm64-v8a --copy-libs --color=always --storage-dir=/root/duifene-build-20260713/.buildozer/android/platform/build-arm64-v8a --ndk-api=29 --hook=/root/duifene-build-20260713/p4a_hook.py --ignore-setup-py --debug' ...
 # Cwd /root/duifene-build-20260713/.buildozer/android/platform/python-for-android
 [WARNING]: prerequisites.py is experimental and does not support all prerequisites yet.
 [WARNING]: Please report any issues to the python-for-android issue tracker.
@@ -39,28 +39,28 @@ https://github.com/kivy/python-for-android.git
 [INFO]:    Found Android API target in $ANDROIDAPI: 35
 [INFO]:    Available Android APIs are (35)
 [INFO]:    Requested API target 35 is available, continuing.
-[INFO]:    Found NDK dir in $ANDROIDNDK: /root/.buildozer/android/platform/android-ndk-r25b
-[INFO]:    Found NDK version 25b
+[INFO]:    Found NDK dir in $ANDROIDNDK: /root/.buildozer/android/platform/android-ndk-r28c
+[INFO]:    Found NDK version 28c
+[WARNING]: Maximum recommended NDK version is 28c, but newer versions may work.
+[WARNING]: Newer NDKs may not be fully supported by p4a.
 [INFO]:    Getting NDK API version (i.e. minimum supported API) from user argument
-[DEBUG]:   All possible dists: [<Distribution: name duifene_sign with recipes (hostpython3, libffi, openssl, sdl2_image, sdl2_mixer, sdl2_ttf, sqlite3, python3, sdl2, pyjnius, setuptools, android, kivy, six, requests, chardet, urllib3, certifi, idna, filetype)>]
-[DEBUG]:   Dist matching name and arch: [<Distribution: name duifene_sign with recipes (hostpython3, libffi, openssl, sdl2_image, sdl2_mixer, sdl2_ttf, sqlite3, python3, sdl2, pyjnius, setuptools, android, kivy, six, requests, chardet, urllib3, certifi, idna, filetype)>]
-[DEBUG]:   Dist matching ndk_api and recipe: [<Distribution: name duifene_sign with recipes (hostpython3, libffi, openssl, sdl2_image, sdl2_mixer, sdl2_ttf, sqlite3, python3, sdl2, pyjnius, setuptools, android, kivy, six, requests, chardet, urllib3, certifi, idna, filetype)>]
+[DEBUG]:   All possible dists: [<Distribution: name duifene_sign with recipes (hostpython3, libffi, openssl, sdl2_image, sdl2_mixer, sdl2_ttf, sqlite3, python3, sdl2, pyjnius, setuptools, android, kivy, filetype, requests, idna, certifi, six, urllib3, chardet)>]
+[DEBUG]:   Dist matching name and arch: [<Distribution: name duifene_sign with recipes (hostpython3, libffi, openssl, sdl2_image, sdl2_mixer, sdl2_ttf, sqlite3, python3, sdl2, pyjnius, setuptools, android, kivy, filetype, requests, idna, certifi, six, urllib3, chardet)>]
+[DEBUG]:   Dist matching ndk_api and recipe: [<Distribution: name duifene_sign with recipes (hostpython3, libffi, openssl, sdl2_image, sdl2_mixer, sdl2_ttf, sqlite3, python3, sdl2, pyjnius, setuptools, android, kivy, filetype, requests, idna, certifi, six, urllib3, chardet)>]
 [INFO]:    Of the existing distributions, the following meet the given requirements:
-[INFO]:    	duifene_sign: min API 29, includes recipes (hostpython3, libffi, openssl, sdl2_image, sdl2_mixer, sdl2_ttf, sqlite3, python3, sdl2, pyjnius, setuptools, android, kivy, six, requests, chardet, urllib3, certifi, idna, filetype), built for archs (arm64-v8a)
+[INFO]:    	duifene_sign: min API 29, includes recipes (hostpython3, libffi, openssl, sdl2_image, sdl2_mixer, sdl2_ttf, sqlite3, python3, sdl2, pyjnius, setuptools, android, kivy, filetype, requests, idna, certifi, six, urllib3, chardet), built for archs (arm64-v8a)
 [INFO]:    duifene_sign has compatible recipes, using this one
-# Build the application #3
+# Build the application #6
 # Copy application source from /root/duifene-build-20260713
 # Remove directory and subdirectory /root/duifene-build-20260713/.buildozer/android/app
 # Create directory /root/duifene-build-20260713/.buildozer/android/app
 # Copy /root/duifene-build-20260713/api_client.py to /root/duifene-build-20260713/.buildozer/android/app/api_client.py
 # Copy /root/duifene-build-20260713/service_state.py to /root/duifene-build-20260713/.buildozer/android/app/service_state.py
+# Copy /root/duifene-build-20260713/crash_reporter.py to /root/duifene-build-20260713/.buildozer/android/app/crash_reporter.py
 # Copy /root/duifene-build-20260713/sign_service.py to /root/duifene-build-20260713/.buildozer/android/app/sign_service.py
 # Copy /root/duifene-build-20260713/session_store.py to /root/duifene-build-20260713/.buildozer/android/app/session_store.py
 # Copy /root/duifene-build-20260713/main.py to /root/duifene-build-20260713/.buildozer/android/app/main.py
 # Copy /root/duifene-build-20260713/requirements.txt to /root/duifene-build-20260713/.buildozer/android/app/requirements.txt
-# Create directory /root/duifene-build-20260713/.buildozer/android/app/tests
-# Copy /root/duifene-build-20260713/tests/test_android_regressions.py to /root/duifene-build-20260713/.buildozer/android/app/tests/test_android_regressions.py
-# Copy /root/duifene-build-20260713/tests/__init__.py to /root/duifene-build-20260713/.buildozer/android/app/tests/__init__.py
 # Create directory /root/duifene-build-20260713/.buildozer/android/app/service
 # Copy /root/duifene-build-20260713/service/main.py to /root/duifene-build-20260713/.buildozer/android/app/service/main.py
 # Copy /root/duifene-build-20260713/service/__init__.py to /root/duifene-build-20260713/.buildozer/android/app/service/__init__.py
@@ -69,7 +69,7 @@ https://github.com/kivy/python-for-android.git
 # Patched service/main.py to include applibs
 # Package the application
 # project.properties updated
-# Run '/opt/buildozer-venv/bin/python3 -m pythonforandroid.toolchain apk --bootstrap sdl2 --dist_name duifene_sign --name 对分易签到 --version 1.1 --package org.example.duifene_sign --minsdk 29 --ndk-api 29 --private /root/duifene-build-20260713/.buildozer/android/app --permission INTERNET --permission ACCESS_NETWORK_STATE --permission FOREGROUND_SERVICE --permission FOREGROUND_SERVICE_DATA_SYNC --permission POST_NOTIFICATIONS --android-entrypoint org.kivy.android.PythonActivity --android-apptheme @android:style/Theme.NoTitleBar --orientation portrait --window --enable-androidx --presplash-color #2196F3 --service monitor:service/main.py:foreground:sticky:foregroundServiceType=dataSync --copy-libs --arch arm64-v8a --color=always --storage-dir=/root/duifene-build-20260713/.buildozer/android/platform/build-arm64-v8a --ndk-api=29 --ignore-setup-py --debug' ...
+# Run '/opt/buildozer-venv/bin/python3 -m pythonforandroid.toolchain apk --bootstrap sdl2 --dist_name duifene_sign --name 对分易签到 --version 1.1 --package org.example.duifene_sign --minsdk 29 --ndk-api 29 --private /root/duifene-build-20260713/.buildozer/android/app --permission INTERNET --permission ACCESS_NETWORK_STATE --permission FOREGROUND_SERVICE --permission FOREGROUND_SERVICE_DATA_SYNC --permission POST_NOTIFICATIONS --android-entrypoint org.kivy.android.PythonActivity --android-apptheme @android:style/Theme.NoTitleBar --orientation portrait --window --enable-androidx --allow-backup false --presplash-color #2196F3 --service monitor:service/main.py:foreground:sticky:foregroundServiceType=dataSync --copy-libs --arch arm64-v8a --color=always --storage-dir=/root/duifene-build-20260713/.buildozer/android/platform/build-arm64-v8a --ndk-api=29 --hook=/root/duifene-build-20260713/p4a_hook.py --ignore-setup-py --debug' ...
 # Cwd /root/duifene-build-20260713/.buildozer/android/platform/python-for-android
 [WARNING]: prerequisites.py is experimental and does not support all prerequisites yet.
 [WARNING]: Please report any issues to the python-for-android issue tracker.
@@ -79,45 +79,49 @@ https://github.com/kivy/python-for-android.git
 [INFO]:    Found Android API target in $ANDROIDAPI: 35
 [INFO]:    Available Android APIs are (35)
 [INFO]:    Requested API target 35 is available, continuing.
-[INFO]:    Found NDK dir in $ANDROIDNDK: /root/.buildozer/android/platform/android-ndk-r25b
-[INFO]:    Found NDK version 25b
+[INFO]:    Found NDK dir in $ANDROIDNDK: /root/.buildozer/android/platform/android-ndk-r28c
+[INFO]:    Found NDK version 28c
+[WARNING]: Maximum recommended NDK version is 28c, but newer versions may work.
+[WARNING]: Newer NDKs may not be fully supported by p4a.
 [INFO]:    Getting NDK API version (i.e. minimum supported API) from user argument
-[DEBUG]:   All possible dists: [<Distribution: name duifene_sign with recipes (hostpython3, libffi, openssl, sdl2_image, sdl2_mixer, sdl2_ttf, sqlite3, python3, sdl2, pyjnius, setuptools, android, kivy, six, requests, chardet, urllib3, certifi, idna, filetype)>]
-[DEBUG]:   Dist matching name and arch: [<Distribution: name duifene_sign with recipes (hostpython3, libffi, openssl, sdl2_image, sdl2_mixer, sdl2_ttf, sqlite3, python3, sdl2, pyjnius, setuptools, android, kivy, six, requests, chardet, urllib3, certifi, idna, filetype)>]
-[DEBUG]:   Dist matching ndk_api and recipe: [<Distribution: name duifene_sign with recipes (hostpython3, libffi, openssl, sdl2_image, sdl2_mixer, sdl2_ttf, sqlite3, python3, sdl2, pyjnius, setuptools, android, kivy, six, requests, chardet, urllib3, certifi, idna, filetype)>]
+[DEBUG]:   All possible dists: [<Distribution: name duifene_sign with recipes (hostpython3, libffi, openssl, sdl2_image, sdl2_mixer, sdl2_ttf, sqlite3, python3, sdl2, pyjnius, setuptools, android, kivy, filetype, requests, idna, certifi, six, urllib3, chardet)>]
+[DEBUG]:   Dist matching name and arch: [<Distribution: name duifene_sign with recipes (hostpython3, libffi, openssl, sdl2_image, sdl2_mixer, sdl2_ttf, sqlite3, python3, sdl2, pyjnius, setuptools, android, kivy, filetype, requests, idna, certifi, six, urllib3, chardet)>]
+[DEBUG]:   Dist matching ndk_api and recipe: [<Distribution: name duifene_sign with recipes (hostpython3, libffi, openssl, sdl2_image, sdl2_mixer, sdl2_ttf, sqlite3, python3, sdl2, pyjnius, setuptools, android, kivy, filetype, requests, idna, certifi, six, urllib3, chardet)>]
 [INFO]:    Of the existing distributions, the following meet the given requirements:
-[INFO]:    	duifene_sign: min API 29, includes recipes (hostpython3, libffi, openssl, sdl2_image, sdl2_mixer, sdl2_ttf, sqlite3, python3, sdl2, pyjnius, setuptools, android, kivy, six, requests, chardet, urllib3, certifi, idna, filetype), built for archs (arm64-v8a)
+[INFO]:    	duifene_sign: min API 29, includes recipes (hostpython3, libffi, openssl, sdl2_image, sdl2_mixer, sdl2_ttf, sqlite3, python3, sdl2, pyjnius, setuptools, android, kivy, filetype, requests, idna, certifi, six, urllib3, chardet), built for archs (arm64-v8a)
 [INFO]:    duifene_sign has compatible recipes, using this one
-[DEBUG]:   All possible dists: [<Distribution: name duifene_sign with recipes (hostpython3, libffi, openssl, sdl2_image, sdl2_mixer, sdl2_ttf, sqlite3, python3, sdl2, pyjnius, setuptools, android, kivy, six, requests, chardet, urllib3, certifi, idna, filetype)>]
-[DEBUG]:   Dist matching name and arch: [<Distribution: name duifene_sign with recipes (hostpython3, libffi, openssl, sdl2_image, sdl2_mixer, sdl2_ttf, sqlite3, python3, sdl2, pyjnius, setuptools, android, kivy, six, requests, chardet, urllib3, certifi, idna, filetype)>]
-[DEBUG]:   Dist matching ndk_api and recipe: [<Distribution: name duifene_sign with recipes (hostpython3, libffi, openssl, sdl2_image, sdl2_mixer, sdl2_ttf, sqlite3, python3, sdl2, pyjnius, setuptools, android, kivy, six, requests, chardet, urllib3, certifi, idna, filetype)>]
+[DEBUG]:   All possible dists: [<Distribution: name duifene_sign with recipes (hostpython3, libffi, openssl, sdl2_image, sdl2_mixer, sdl2_ttf, sqlite3, python3, sdl2, pyjnius, setuptools, android, kivy, filetype, requests, idna, certifi, six, urllib3, chardet)>]
+[DEBUG]:   Dist matching name and arch: [<Distribution: name duifene_sign with recipes (hostpython3, libffi, openssl, sdl2_image, sdl2_mixer, sdl2_ttf, sqlite3, python3, sdl2, pyjnius, setuptools, android, kivy, filetype, requests, idna, certifi, six, urllib3, chardet)>]
+[DEBUG]:   Dist matching ndk_api and recipe: [<Distribution: name duifene_sign with recipes (hostpython3, libffi, openssl, sdl2_image, sdl2_mixer, sdl2_ttf, sqlite3, python3, sdl2, pyjnius, setuptools, android, kivy, filetype, requests, idna, certifi, six, urllib3, chardet)>]
 [INFO]:    Of the existing distributions, the following meet the given requirements:
-[INFO]:    	duifene_sign: min API 29, includes recipes (hostpython3, libffi, openssl, sdl2_image, sdl2_mixer, sdl2_ttf, sqlite3, python3, sdl2, pyjnius, setuptools, android, kivy, six, requests, chardet, urllib3, certifi, idna, filetype), built for archs (arm64-v8a)
+[INFO]:    	duifene_sign: min API 29, includes recipes (hostpython3, libffi, openssl, sdl2_image, sdl2_mixer, sdl2_ttf, sqlite3, python3, sdl2, pyjnius, setuptools, android, kivy, filetype, requests, idna, certifi, six, urllib3, chardet), built for archs (arm64-v8a)
 [INFO]:    duifene_sign has compatible recipes, using this one
 [INFO]:    -> directory context /root/duifene-build-20260713/.buildozer/android/platform/build-arm64-v8a/build/bootstrap_builds/sdl2
 [INFO]:    <- directory context /root/duifene-build-20260713/.buildozer/android/platform/python-for-android
 [INFO]:    -> directory context /root/duifene-build-20260713/.buildozer/android/platform/build-arm64-v8a/dists/duifene_sign
+[INFO]:    Hook: ignore before_apk_build
 [DEBUG]:   Remove directory and subdirectory src/main/assets
 [DEBUG]:   Create directory src/main/assets
 Compiling '/root/duifene-build-20260713/.buildozer/android/app/api_client.py'...
 Compiling '/root/duifene-build-20260713/.buildozer/android/app/service_state.py'...
+Compiling '/root/duifene-build-20260713/.buildozer/android/app/crash_reporter.py'...
 Compiling '/root/duifene-build-20260713/.buildozer/android/app/sign_service.py'...
 Compiling '/root/duifene-build-20260713/.buildozer/android/app/sitecustomize.py'...
 Compiling '/root/duifene-build-20260713/.buildozer/android/app/session_store.py'...
 Compiling '/root/duifene-build-20260713/.buildozer/android/app/main.py'...
-Compiling '/root/duifene-build-20260713/.buildozer/android/app/tests/test_android_regressions.py'...
-Compiling '/root/duifene-build-20260713/.buildozer/android/app/tests/__init__.py'...
 Compiling '/root/duifene-build-20260713/.buildozer/android/app/service/main.py'...
 Compiling '/root/duifene-build-20260713/.buildozer/android/app/service/__init__.py'...
-[DEBUG]:   Remove directory and subdirectory /tmp/p4a-extra-env-6t1lqwju
+[DEBUG]:   Remove directory and subdirectory /tmp/p4a-extra-env-3n92mq97
 [DEBUG]:   Remove directory and subdirectory src/main/res
+[INFO]:    Hook: ignore after_apk_build
+[INFO]:    Hook: execute before_apk_assemble
 [INFO]:    Detected highest available build tools version to be 37.0.0
 stty: 'standard input': Inappropriate ioctl for device
 [DEBUG]:   -> running gradlew clean assembleDebug
 [DEBUG]:
 [DEBUG]:
-[DEBUG]:   	> Connecting to Daemon<-------------> 0% CONFIGURING [78ms]> root project<-------------> 0% CONFIGURING [178ms]<-------------> 0% CONFIGURING [278ms]<-------------> 0% CONFIGURING [378ms]<-------------> 0% CONFIGURING [478ms]<-------------> 0% CONFIGURING [578ms]<-------------> 0% CONFIGURING [678ms]<=============> 100% CONFIGURING [778ms]> IDLE<=============> 100% CONFIGURING [878ms]<=============> 100% CONFIGURING [978ms]<=============> 100% CONFIGURING [1s]<=------------> 9% EXECUTING [1s]> :javaPreCompileDebug<==-----------> 21% EXECUTING [1s]> :mergeDebugResources
-[DEBUG]:   	> :packageDebugResources<===----------> 26% EXECUTING [1s]> IDLE> :parseDebugLocalResources > Resolve files of configuration ':androidApis'<====---------> 34% EXECUTING [1s]> :processDebugMainManifest> IDLE
+[DEBUG]:   	<-------------> 0% CONFIGURING [101ms]> root project > Resolve dependencies of classpath<-------------> 0% CONFIGURING [201ms]> root project<=============> 100% CONFIGURING [301ms]> IDLE<=------------> 9% EXECUTING [401ms]> :javaPreCompileDebug
+[DEBUG]:   	<===----------> 29% EXECUTING [501ms]> :parseDebugLocalResources> :extractDeepLinksDebug
 [DEBUG]:   	> Task :processDebugMainManifest
 [DEBUG]:   	/root/duifene-build-20260713/.buildozer/android/platform/build-arm64-v8a/dists/duifene_sign/src/main/AndroidManifest.xml:63:18-50 Warning:
 [DEBUG]:   	        android:extractNativeLibs should not be specified in this source AndroidManifest.xml file. See https://d.android.com/guide/topics/manifest/application-element#extractNativeLibs for more information.
@@ -125,17 +129,14 @@ stty: 'standard input': Inappropriate ioctl for device
 [DEBUG]:
 [DEBUG]:
 [DEBUG]:
-[DEBUG]:   	<====---------> 36% EXECUTING [2s]> :processDebugManifest> IDLE
-[DEBUG]:
-[DEBUG]:   	<=======------> 60% EXECUTING [2s]> :processDebugManifestForPackage> :mergeDebugJavaResource> :mergeLibDexDebug> :mergeDebugJniLibFolders<========-----> 65% EXECUTING [2s]> IDLE> IDLE<========-----> 68% EXECUTING [2s]> :validateSigningDebug> :mergeDebugNativeLibs<=========----> 70% EXECUTING [2s]> IDLE<=========----> 73% EXECUTING [2s]> IDLE<==========---> 82% EXECUTING [2s]> :processDebugResources > Resolve dependencies of :detachedConfiguration2 > aa<==========---> 82% EXECUTING [3s]> :processDebugResources > Resolve files of configuration ':detachedConfigurati> :processDebugResources<===========--> 85% EXECUTING [3s]> :compileDebugJavaWithJavac<===========--> 85% EXECUTING [4s]
+[DEBUG]:   	<========-----> 65% EXECUTING [601ms]> :processDebugManifestForPackage> :mergeDebugJniLibFolders<==========---> 78% EXECUTING [701ms]> :processDebugResources> :mergeDebugNativeLibs<==========---> 82% EXECUTING [801ms]> IDLE<==========---> 82% EXECUTING [901ms]<==========---> 82% EXECUTING [1s]<===========--> 85% EXECUTING [1s]> :compileDebugJavaWithJavac
 [DEBUG]:   	> Task :compileDebugJavaWithJavac
 [DEBUG]:   	Note: Some input files use or override a deprecated API.
 [DEBUG]:   	Note: Recompile with -Xlint:deprecation for details.
 [DEBUG]:
 [DEBUG]:
 [DEBUG]:
-[DEBUG]:
-[DEBUG]:   	<===========--> 87% EXECUTING [5s]> :dexBuilderDebug> IDLE> IDLE> IDLE<===========--> 87% EXECUTING [6s]<===========--> 90% EXECUTING [7s]> :mergeProjectDexDebug<============-> 92% EXECUTING [7s]> :packageDebug
+[DEBUG]:   	<===========--> 87% EXECUTING [1s]> :dexBuilderDebug> IDLE<===========--> 87% EXECUTING [2s]<===========--> 90% EXECUTING [2s]> :mergeProjectDexDebug<============-> 92% EXECUTING [2s]> :packageDebug
 [DEBUG]:   	[Incubating] Problems report is available at: file:///root/duifene-build-20260713/.buildozer/android/platform/build-arm64-v8a/dists/duifene_sign/build/reports/problems/problems-report.html
 [DEBUG]:
 [DEBUG]:   	Deprecated Gradle features were used in this build, making it incompatible with Gradle 9.0.
@@ -144,21 +145,20 @@ stty: 'standard input': Inappropriate ioctl for device
 [DEBUG]:
 [DEBUG]:   	For more on this, please refer to https://docs.gradle.org/8.14.3/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
 [DEBUG]:
-[DEBUG]:   	BUILD SUCCESSFUL in 7s
+[DEBUG]:   	BUILD SUCCESSFUL in 3s
 [DEBUG]:   	34 actionable tasks: 34 executed
 [DEBUG]:
 [DEBUG]:
 [DEBUG]:
-[DEBUG]:
-[DEBUG]:
-[DEBUG]:   	<-------------> 0% WAITING> :packageDebug> IDLE> IDLE> IDLE
+[DEBUG]:   	<-------------> 0% WAITING> :packageDebug> IDLE
 [INFO]:    <- directory context /root/duifene-build-20260713/.buildozer/android/platform/python-for-android
-[DEBUG]:   All possible dists: [<Distribution: name duifene_sign with recipes (hostpython3, libffi, openssl, sdl2_image, sdl2_mixer, sdl2_ttf, sqlite3, python3, sdl2, pyjnius, setuptools, android, kivy, six, requests, chardet, urllib3, certifi, idna, filetype)>]
-[DEBUG]:   Dist matching name and arch: [<Distribution: name duifene_sign with recipes (hostpython3, libffi, openssl, sdl2_image, sdl2_mixer, sdl2_ttf, sqlite3, python3, sdl2, pyjnius, setuptools, android, kivy, six, requests, chardet, urllib3, certifi, idna, filetype)>]
-[DEBUG]:   Dist matching ndk_api and recipe: [<Distribution: name duifene_sign with recipes (hostpython3, libffi, openssl, sdl2_image, sdl2_mixer, sdl2_ttf, sqlite3, python3, sdl2, pyjnius, setuptools, android, kivy, six, requests, chardet, urllib3, certifi, idna, filetype)>]
+[DEBUG]:   All possible dists: [<Distribution: name duifene_sign with recipes (hostpython3, libffi, openssl, sdl2_image, sdl2_mixer, sdl2_ttf, sqlite3, python3, sdl2, pyjnius, setuptools, android, kivy, filetype, requests, idna, certifi, six, urllib3, chardet)>]
+[DEBUG]:   Dist matching name and arch: [<Distribution: name duifene_sign with recipes (hostpython3, libffi, openssl, sdl2_image, sdl2_mixer, sdl2_ttf, sqlite3, python3, sdl2, pyjnius, setuptools, android, kivy, filetype, requests, idna, certifi, six, urllib3, chardet)>]
+[DEBUG]:   Dist matching ndk_api and recipe: [<Distribution: name duifene_sign with recipes (hostpython3, libffi, openssl, sdl2_image, sdl2_mixer, sdl2_ttf, sqlite3, python3, sdl2, pyjnius, setuptools, android, kivy, filetype, requests, idna, certifi, six, urllib3, chardet)>]
 [INFO]:    Of the existing distributions, the following meet the given requirements:
-[INFO]:    	duifene_sign: min API 29, includes recipes (hostpython3, libffi, openssl, sdl2_image, sdl2_mixer, sdl2_ttf, sqlite3, python3, sdl2, pyjnius, setuptools, android, kivy, six, requests, chardet, urllib3, certifi, idna, filetype), built for archs (arm64-v8a)
+[INFO]:    	duifene_sign: min API 29, includes recipes (hostpython3, libffi, openssl, sdl2_image, sdl2_mixer, sdl2_ttf, sqlite3, python3, sdl2, pyjnius, setuptools, android, kivy, filetype, requests, idna, certifi, six, urllib3, chardet), built for archs (arm64-v8a)
 [INFO]:    duifene_sign has compatible recipes, using this one
+[INFO]:    Hook: ignore after_apk_assemble
 [INFO]:    # Copying android package to current directory
 [INFO]:    # Android package filename not found in build output. Guessing...
 [INFO]:    # Found android package file: /root/duifene-build-20260713/.buildozer/android/platform/build-arm64-v8a/dists/duifene_sign/build/outputs/apk/debug/duifene_sign-debug.apk
