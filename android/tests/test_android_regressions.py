@@ -410,6 +410,13 @@ class ForegroundServiceTests(unittest.TestCase):
             }.issubset(permissions)
         )
 
+    def test_buildozer_omits_empty_gradle_dependencies(self):
+        parser = configparser.ConfigParser(interpolation=None)
+        spec_path = Path(__file__).resolve().parents[1] / "buildozer.spec"
+        parser.read(spec_path, encoding="utf-8")
+
+        self.assertNotIn("android.gradle_dependencies", parser["app"])
+
     def test_bootstrap_helpers_parse_argument_and_prefer_shared_monitor_state(self):
         self.assertEqual(parse_service_argument("not-json"), {})
         self.assertEqual(parse_service_argument("[]"), {})

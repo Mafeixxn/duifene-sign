@@ -54,3 +54,26 @@ Run from `F:\成品\安卓版签到`:
 | Command | Result |
 | --- | --- |
 | `git diff --check -- README.md .superpowers/sdd/task-6-report.md` | PASS: exit code 0. |
+
+## Buildozer Empty Dependency Regression Fix
+
+Root cause: Buildozer 1.6.0 translates an empty
+`android.gradle_dependencies =` declaration to the p4a argument `--depend ''`,
+which causes Gradle to reject the empty module notation.
+
+### RED
+
+| Command | Result |
+| --- | --- |
+| `python -m unittest android.tests.test_android_regressions.ForegroundServiceTests.test_buildozer_omits_empty_gradle_dependencies -v` | Expected FAIL: `AssertionError: 'android.gradle_dependencies' unexpectedly found in <Section: app>`; 1 test ran, 1 failure. |
+
+### GREEN
+
+| Command | Result |
+| --- | --- |
+| `python -m unittest android.tests.test_android_regressions.ForegroundServiceTests.test_buildozer_omits_empty_gradle_dependencies -v` | PASS: 1 test ran, exit code 0. |
+| `python -m unittest android.tests.test_android_regressions -v` | PASS: 45 tests ran, 44 passed and 1 expected skip because Kivy is not installed on this host; exit code 0. |
+
+The fix removes only the empty `android.gradle_dependencies` line. The added
+regression test requires the option to be absent whenever there are no Gradle
+dependencies.

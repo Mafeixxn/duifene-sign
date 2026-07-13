@@ -15,7 +15,6 @@ android.permissions = INTERNET, ACCESS_NETWORK_STATE, FOREGROUND_SERVICE, FOREGR
 android.api = 35
 android.minapi = 29
 android.ndk = 25b
-android.gradle_dependencies =
 android.archs = arm64-v8a
 android.accept_sdk_license = True
 android.allow_backup = True
