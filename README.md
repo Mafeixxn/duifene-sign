@@ -221,7 +221,7 @@ python main.py
 
 [![MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
-## Android 10+ Usage Notes
+## Android 10+ 使用说明
 
 Android 版本需要 **Android 10（API 29）或更高版本**，仅支持通过微信 OAuth 回调链接登录。程序不提供账号、密码登录入口；请按上文步骤将微信中复制的 OAuth 链接粘贴到应用中。
 
