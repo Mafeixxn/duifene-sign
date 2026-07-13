@@ -145,7 +145,15 @@ class ApiClient:
             {"Action": "checklogin"},
             headers,
         )
-        return r.status_code == 200 and self._safe_json(r).get("msg") == "1"
+        if r.status_code != 200:
+            raise ConnectionError(f"登录状态检查失败，状态码: {r.status_code}")
+        try:
+            payload = r.json()
+        except Exception as exc:
+            raise ValueError("登录状态响应不是有效 JSON") from exc
+        if not isinstance(payload, dict) or str(payload.get("msg")) not in {"0", "1"}:
+            raise ValueError("登录状态响应缺少明确的登录状态")
+        return str(payload["msg"]) == "1"
 
     # ─── 课程 ───
 

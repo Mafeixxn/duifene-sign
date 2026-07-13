@@ -14,6 +14,7 @@ if SOURCE_DIR not in sys.path:
     sys.path.insert(0, SOURCE_DIR)
 
 from api_client import ApiClient
+from crash_reporter import install_crash_hooks, write_crash
 from service_state import ServiceState
 from sign_service import SignService
 
@@ -127,9 +128,11 @@ def main():
     """Run under p4a; its generated foreground service owns the notification."""
     raw_argument = os.environ.get("PYTHON_SERVICE_ARGUMENT", "")
     state = ServiceState(resolve_private_app_dir(_service_context()))
+    install_crash_hooks(state.base_dir)
     try:
         run_monitor(state, raw_argument)
     except Exception as exc:
+        write_crash(state.base_dir, type(exc), exc, exc.__traceback__)
         _append_event(state, "error", f"Monitoring service failed: {exc}")
 
 

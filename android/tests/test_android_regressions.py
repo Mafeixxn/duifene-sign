@@ -3,8 +3,10 @@ import datetime
 import importlib
 import inspect
 import json
+import sys
 import tempfile
 import threading
+import types
 import unittest
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
@@ -30,6 +32,8 @@ class FakeResponse:
         self.text = text
 
     def json(self):
+        if isinstance(self._payload, Exception):
+            raise self._payload
         return self._payload
 
 
@@ -106,6 +110,33 @@ class ApiClientTests(unittest.TestCase):
             ),
             "微信链接登录成功",
         )
+
+    def test_check_login_raises_for_temporary_http_failures(self):
+        for status_code in (429, 503):
+            with self.subTest(status_code=status_code):
+                self.session.post = lambda *args, **kwargs: FakeResponse(
+                    status_code=status_code
+                )
+                with self.assertRaisesRegex(ConnectionError, str(status_code)):
+                    self.api.check_login()
+
+    def test_check_login_raises_for_malformed_json(self):
+        self.session.post = lambda *args, **kwargs: FakeResponse(
+            payload=ValueError("malformed")
+        )
+
+        with self.assertRaisesRegex(ValueError, "JSON"):
+            self.api.check_login()
+
+    def test_check_login_returns_false_only_for_explicit_expiry(self):
+        self.session.post = lambda *args, **kwargs: FakeResponse(payload={"msg": "0"})
+
+        self.assertFalse(self.api.check_login())
+
+    def test_check_login_returns_true_for_valid_session(self):
+        self.session.post = lambda *args, **kwargs: FakeResponse(payload={"msg": "1"})
+
+        self.assertTrue(self.api.check_login())
 
     def test_form_values_with_reserved_characters_remain_structured(self):
         self.api.login_by_password("user&role=admin", "pass=word&token=abc")
@@ -308,6 +339,18 @@ class PrivateStorageTests(unittest.TestCase):
         state.clear_stop()
         self.assertFalse(state.stop_requested())
 
+    def test_timeout_marker_is_consumed_once_and_cleared_for_new_config(self):
+        state = ServiceState(self.base_dir)
+
+        state.request_timeout()
+        self.assertTrue(state.timeout_requested())
+        self.assertTrue(state.consume_timeout())
+        self.assertFalse(state.consume_timeout())
+
+        state.request_timeout()
+        state.write_config({"course_id": "new"})
+        self.assertFalse(state.timeout_requested())
+
     def test_event_reader_ignores_malformed_json_lines(self):
         state = ServiceState(self.base_dir)
         state.append_event({"level": "info", "message": "first"})
@@ -416,6 +459,96 @@ class ForegroundServiceTests(unittest.TestCase):
         parser.read(spec_path, encoding="utf-8")
 
         self.assertNotIn("android.gradle_dependencies", parser["app"])
+
+    def test_buildozer_uses_ndk_28c_disables_backup_and_registers_hook(self):
+        parser = configparser.ConfigParser(interpolation=None)
+        spec_path = Path(__file__).resolve().parents[1] / "buildozer.spec"
+        parser.read(spec_path, encoding="utf-8")
+
+        app = parser["app"]
+        self.assertEqual(app["android.ndk"], "28c")
+        self.assertEqual(app["android.allow_backup"], "False")
+        self.assertEqual(app["p4a.hook"], "p4a_hook.py")
+
+    def test_buildozer_excludes_only_private_runtime_test_and_build_files(self):
+        parser = configparser.ConfigParser(interpolation=None)
+        spec_path = Path(__file__).resolve().parents[1] / "buildozer.spec"
+        parser.read(spec_path, encoding="utf-8")
+        patterns = {
+            item.strip()
+            for item in parser["app"]["source.exclude_patterns"].split(",")
+        }
+
+        required = {
+            "cookie.txt",
+            "monitor.json",
+            "monitor.stop",
+            "monitor.timeout",
+            "monitor-events.jsonl",
+            "crash.log",
+            "crash-*.log",
+            ".cookie.txt.*.tmp",
+            ".monitor.json.*.tmp",
+            ".monitor.stop.*.tmp",
+            ".monitor.timeout.tmp",
+            ".monitor.timeout.*.tmp",
+            ".monitor-events.jsonl.*.tmp",
+            ".crash.log.*.tmp",
+            ".crash-*.log.*.tmp",
+            "tests/*",
+            ".buildozer/*",
+            "bin/*",
+            "build/*",
+            "dist/*",
+            "**/__pycache__/*",
+        }
+        self.assertTrue(required.issubset(patterns))
+        self.assertTrue({"*.png", "*.jpg", "main.py", "service/*"}.isdisjoint(patterns))
+
+    def test_p4a_hook_patches_generated_service_idempotently(self):
+        from android.p4a_hook import patch_service_java
+
+        generated = """package org.example.duifene_sign;
+
+public class ServiceMonitor extends org.kivy.android.PythonService {
+    public static void start(android.content.Context context, String argument) {}
+}
+"""
+        with tempfile.TemporaryDirectory() as base_dir:
+            java_path = Path(base_dir) / "ServiceMonitor.java"
+            java_path.write_text(generated, encoding="utf-8")
+
+            self.assertTrue(patch_service_java(java_path))
+            patched = java_path.read_text(encoding="utf-8")
+            self.assertFalse(patch_service_java(java_path))
+            self.assertEqual(java_path.read_text(encoding="utf-8"), patched)
+
+        self.assertIn("public void onTimeout(int startId, int fgsType)", patched)
+        self.assertIn('"monitor.timeout"', patched)
+        self.assertIn("getFilesDir()", patched)
+        self.assertIn("stopSelf(startId)", patched)
+        self.assertNotIn("Cookie", patched)
+
+    def test_p4a_hook_fails_closed_when_generated_service_is_missing_or_unrecognized(self):
+        from android.p4a_hook import patch_service_java
+
+        with tempfile.TemporaryDirectory() as base_dir:
+            missing = Path(base_dir) / "ServiceMonitor.java"
+            with self.assertRaises(FileNotFoundError):
+                patch_service_java(missing)
+
+            missing.write_text("public class Unexpected {}\n", encoding="utf-8")
+            with self.assertRaises(RuntimeError):
+                patch_service_java(missing)
+
+            missing.write_text(
+                "public class ServiceMonitor extends PythonService {\n"
+                "    public void onTimeout(int startId, int fgsType) {}\n"
+                "}\n",
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(RuntimeError, "timeout override"):
+                patch_service_java(missing)
 
     def test_bootstrap_helpers_parse_argument_and_prefer_shared_monitor_state(self):
         self.assertEqual(parse_service_argument("not-json"), {})
@@ -588,6 +721,58 @@ class ActivityUiTests(unittest.TestCase):
             {"message": "Monitoring started."},
         ]))
 
+    def test_timeout_marker_records_visible_terminal_event_and_stops_restored_state(self):
+        module = self._activity_module()
+        with tempfile.TemporaryDirectory() as base_dir:
+            state = ServiceState(base_dir)
+            state.write_config({"course_id": "1"})
+            state.request_timeout()
+
+            event = module.consume_timeout_termination(state)
+
+            self.assertEqual(event["level"], "error")
+            self.assertEqual(event["message"], module.TIMEOUT_EVENT_MESSAGE)
+            self.assertFalse(state.timeout_requested())
+            self.assertEqual(state.read_events()[-1], event)
+            self.assertFalse(module.lifecycle_monitoring_state(event["message"]))
+            self.assertFalse(module.restored_monitoring_state(
+                True, False, state.read_events(), timeout_requested=True
+            ))
+
+    def test_login_worker_helper_uses_verified_oauth_result_without_second_check(self):
+        module = self._activity_module()
+
+        class FakeApi:
+            def __init__(self):
+                self.check_calls = 0
+
+            def login_by_wechat_link(self, link):
+                self.link = link
+                return "微信链接登录成功"
+
+            def check_login(self):
+                self.check_calls += 1
+                return True
+
+            def export_cookie(self):
+                return "sid=verified"
+
+            def get_course_list(self):
+                return [{"CourseID": 1}]
+
+        class FakeStore:
+            def save_cookie(self, cookie):
+                self.cookie = cookie
+
+        api = FakeApi()
+        store = FakeStore()
+        result = module.complete_wechat_login(lambda: api, store, "oauth-link")
+
+        self.assertEqual(result, (api, [{"CourseID": 1}], "微信链接登录成功", True))
+        self.assertEqual(api.check_calls, 0)
+        self.assertEqual(store.cookie, "sid=verified")
+
+
     def test_event_identity_tracker_survives_rollover_and_pause_with_bounded_memory(self):
         module = self._activity_module()
         tracker = module.EventIdentityTracker(max_seen=400)
@@ -680,6 +865,76 @@ class ActivityUiTests(unittest.TestCase):
 
         self.assertNotIn("password", visible_copy)
         self.assertNotIn("密码", visible_copy)
+
+
+class CrashReporterTests(unittest.TestCase):
+    def test_crash_report_is_atomic_unicode_and_excludes_sensitive_values(self):
+        from android.crash_reporter import write_crash
+
+        with tempfile.TemporaryDirectory() as base_dir:
+            sensitive_cookie = "cookie=do-not-record"
+            try:
+                raise RuntimeError(f"测试崩溃 {sensitive_cookie}")
+            except RuntimeError:
+                report_path = write_crash(base_dir, *sys.exc_info())
+
+            report = report_path.read_text(encoding="utf-8")
+            leftovers = list(Path(base_dir).glob(".crash.log.*.tmp"))
+
+        self.assertIn("测试崩溃", report)
+        self.assertIn("Traceback", report)
+        self.assertNotIn("do-not-record", report)
+        self.assertNotIn("sensitive_cookie", report)
+        self.assertEqual(leftovers, [])
+
+    def test_crash_hooks_write_then_delegate_to_original_hooks(self):
+        from android.crash_reporter import install_crash_hooks
+
+        delegated = []
+        fake_sys = types.SimpleNamespace(
+            excepthook=lambda *args: delegated.append(("sys", args))
+        )
+        fake_threading = types.SimpleNamespace(
+            excepthook=lambda args: delegated.append(("thread", args))
+        )
+
+        with tempfile.TemporaryDirectory() as base_dir:
+            install_crash_hooks(
+                base_dir, sys_module=fake_sys, threading_module=fake_threading
+            )
+            try:
+                raise ValueError("线程异常")
+            except ValueError:
+                exc_info = sys.exc_info()
+            fake_sys.excepthook(*exc_info)
+            thread_args = types.SimpleNamespace(
+                exc_type=exc_info[0],
+                exc_value=exc_info[1],
+                exc_traceback=exc_info[2],
+                thread=None,
+            )
+            fake_threading.excepthook(thread_args)
+            report = (Path(base_dir) / "crash.log").read_text(encoding="utf-8")
+
+        self.assertEqual([kind for kind, _args in delegated], ["sys", "thread"])
+        self.assertIn("线程异常", report)
+
+    def test_activity_and_service_wire_crash_reporting_after_private_dir_exists(self):
+        activity_source = inspect.getsource(importlib.import_module("android.main"))
+        service_module = importlib.import_module("android.service.main")
+        service_source = inspect.getsource(service_module)
+
+        self.assertIn("install_crash_hooks(base_dir)", activity_source)
+        self.assertIn("install_crash_hooks(state.base_dir)", service_source)
+        self.assertIn("write_crash(state.base_dir", service_source)
+
+
+class DocumentationTests(unittest.TestCase):
+    def test_readme_says_notification_denial_prevents_monitor_start(self):
+        readme_path = Path(__file__).resolve().parents[2] / "README.md"
+        readme = readme_path.read_text(encoding="utf-8")
+
+        self.assertIn("拒绝通知权限后，应用不会启动监听", readme)
 
 if __name__ == "__main__":
     unittest.main()

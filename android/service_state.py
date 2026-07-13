@@ -12,6 +12,7 @@ class ServiceState:
 
     CONFIG_FILE = "monitor.json"
     STOP_FILE = "monitor.stop"
+    TIMEOUT_FILE = "monitor.timeout"
     EVENT_FILE = "monitor-events.jsonl"
     MAX_EVENT_LINES = 200
 
@@ -23,6 +24,7 @@ class ServiceState:
             raise ValueError("base_dir must be a directory")
         self.config_path = self.base_dir / self.CONFIG_FILE
         self.stop_path = self.base_dir / self.STOP_FILE
+        self.timeout_path = self.base_dir / self.TIMEOUT_FILE
         self.events_path = self.base_dir / self.EVENT_FILE
 
     def write_config(self, config):
@@ -32,6 +34,7 @@ class ServiceState:
         payload = json.dumps(dict(config), ensure_ascii=False, separators=(",", ":"))
         self._replace_text(self.config_path, f"{payload}\n")
         self.clear_stop()
+        self.clear_timeout()
 
     def read_config(self):
         """Return the monitor configuration or None when it is unavailable or invalid."""
@@ -54,6 +57,28 @@ class ServiceState:
 
     def stop_requested(self):
         return self.stop_path.is_file()
+
+    def request_timeout(self):
+        """Atomically create the marker also written by the generated Java service."""
+        self._replace_text(self.timeout_path, "timeout\n")
+
+    def clear_timeout(self):
+        """Remove a stale Android foreground-service timeout marker."""
+        try:
+            self.timeout_path.unlink()
+        except FileNotFoundError:
+            pass
+
+    def timeout_requested(self):
+        return self.timeout_path.is_file()
+
+    def consume_timeout(self):
+        """Remove and report one complete timeout marker exactly once."""
+        try:
+            self.timeout_path.unlink()
+        except FileNotFoundError:
+            return False
+        return True
 
     def append_event(self, event):
         """Append one compact JSON event while retaining only recent log lines."""

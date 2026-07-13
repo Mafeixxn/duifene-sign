@@ -3,20 +3,26 @@
 import datetime
 import json
 import threading
+import time
 from collections import Counter, deque
+from uuid import uuid4
 
 try:
     from .api_client import ApiClient
+    from .crash_reporter import install_crash_hooks
     from .service_state import ServiceState
     from .session_store import SessionStore
 except ImportError:  # python-for-android runs this file as a top-level module.
     from api_client import ApiClient
+    from crash_reporter import install_crash_hooks
     from service_state import ServiceState
     from session_store import SessionStore
 
 
 DEFAULT_COUNTDOWN = 10
 SERVICE_CLASS = "org.example.duifene_sign.ServiceMonitor"
+WECHAT_LOGIN_SUCCESS = "微信链接登录成功"
+TIMEOUT_EVENT_MESSAGE = "监控已停止：Android 前台服务达到系统时限。"
 
 
 def normalize_countdown(value, default=DEFAULT_COUNTDOWN):
@@ -78,6 +84,17 @@ def start_daemon_worker(target, *args, name="activity-worker", **kwargs):
     return worker
 
 
+def complete_wechat_login(api_factory, session_store, link):
+    """Complete one OAuth login whose API method already verifies the session."""
+    api = api_factory()
+    message = str(api.login_by_wechat_link(link))
+    if message != WECHAT_LOGIN_SUCCESS:
+        return None, [], message, False
+    session_store.save_cookie(api.export_cookie())
+    courses = api.get_course_list()
+    return api, courses, message, True
+
+
 def vertical_stack_height(child_heights, spacing=7, padding=10):
     """Return a fixed vertical layout height without clipping its children."""
     heights = list(child_heights)
@@ -94,6 +111,7 @@ def lifecycle_monitoring_state(message):
         "Monitoring stopped.",
         "Monitoring stopped before service startup.",
         "Monitoring configuration is unavailable.",
+        TIMEOUT_EVENT_MESSAGE,
     } or message.startswith("Monitoring service failed:"):
         return False
     return None
@@ -109,12 +127,32 @@ def apply_lifecycle_events(monitoring, events):
     return monitoring
 
 
-def restored_monitoring_state(config_available, stop_requested, events):
+def restored_monitoring_state(
+    config_available, stop_requested, events, timeout_requested=False
+):
     """Infer service state without allowing stale events to revive invalid config."""
-    monitoring = bool(config_available) and not bool(stop_requested)
+    monitoring = (
+        bool(config_available)
+        and not bool(stop_requested)
+        and not bool(timeout_requested)
+    )
     if not monitoring:
         return False
     return apply_lifecycle_events(monitoring, events)
+
+
+def consume_timeout_termination(state):
+    """Consume Java's timeout marker and persist one user-visible terminal event."""
+    if not state.consume_timeout():
+        return None
+    event = {
+        "event_id": uuid4().hex,
+        "level": "error",
+        "message": TIMEOUT_EVENT_MESSAGE,
+        "timestamp": int(time.time()),
+    }
+    state.append_event(event)
+    return event
 
 
 class EventIdentityTracker:
@@ -317,6 +355,7 @@ if KIVY_AVAILABLE:
             **kwargs,
         ):
             super().__init__(**kwargs)
+            install_crash_hooks(base_dir)
             self.orientation = "vertical"
             self.padding = [dp(12), dp(9)]
             self.spacing = dp(8)
@@ -473,17 +512,13 @@ if KIVY_AVAILABLE:
 
         def _login_worker(self, link):
             try:
-                api = self.api_factory()
-                message = api.login_by_wechat_link(link)
-                if not api.check_login():
-                    self._schedule(self._finish_login, None, [], str(message), False)
-                    return
-                self.session_store.save_cookie(api.export_cookie())
-                courses = api.get_course_list()
+                result = complete_wechat_login(
+                    self.api_factory, self.session_store, link
+                )
             except Exception as exc:
                 self._schedule(self._finish_login, None, [], f"登录失败: {exc}", False)
                 return
-            self._schedule(self._finish_login, api, courses, str(message), True)
+            self._schedule(self._finish_login, *result)
 
         @mainthread
         def _finish_login(self, api, courses, message, success):
@@ -533,6 +568,7 @@ if KIVY_AVAILABLE:
                 return
             cookie = self.api.export_cookie()
             argument = service_argument_json(cookie, self._selected_course, self.countdown_input.text)
+            self.service_state.clear_timeout()
             self.service_state.write_config(json.loads(argument))
             self._set_service_busy(True, "启动中")
             self.bridge.start(
@@ -626,12 +662,14 @@ if KIVY_AVAILABLE:
                 bool(config),
                 self.service_state.stop_requested(),
                 self.service_state.read_events(),
+                timeout_requested=self.service_state.timeout_requested(),
             )
             self._sync_controls()
 
         def _poll_events(self, _dt):
             if not self._visible:
                 return False
+            consume_timeout_termination(self.service_state)
             events = self.service_state.read_events()
             new_events = self._event_tracker.unseen(events)
             lifecycle_seen = False
