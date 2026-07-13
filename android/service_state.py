@@ -1,10 +1,12 @@
 """File-based IPC state shared by the activity and foreground service."""
 
+import hashlib
 import json
 import os
 import tempfile
 from collections.abc import Mapping
 from pathlib import Path
+from uuid import uuid4
 
 
 class ServiceState:
@@ -13,6 +15,7 @@ class ServiceState:
     CONFIG_FILE = "monitor.json"
     STOP_FILE = "monitor.stop"
     TIMEOUT_FILE = "monitor.timeout"
+    TIMEOUT_CLAIM_PREFIX = ".monitor.timeout.ack."
     EVENT_FILE = "monitor-events.jsonl"
     MAX_EVENT_LINES = 200
 
@@ -58,26 +61,77 @@ class ServiceState:
     def stop_requested(self):
         return self.stop_path.is_file()
 
-    def request_timeout(self):
+    def request_timeout(self, token=None):
         """Atomically create the marker also written by the generated Java service."""
-        self._replace_text(self.timeout_path, "timeout\n")
+        token = str(token or uuid4()).strip()
+        if not token or "\n" in token or "\r" in token:
+            raise ValueError("timeout token must be one non-empty line")
+        self._replace_text(self.timeout_path, f"{token}\n")
+        return token
+
+    def _timeout_claim_paths(self):
+        return sorted(
+            path
+            for path in self.base_dir.glob(f"{self.TIMEOUT_CLAIM_PREFIX}*")
+            if path.is_file()
+        )
+
+    @staticmethod
+    def _read_timeout_path(path):
+        try:
+            token = path.read_text(encoding="utf-8").strip()
+        except (OSError, UnicodeError):
+            return None
+        return token or None
+
+    def read_timeout_token(self):
+        """Read pending timeout evidence without deleting it."""
+        for path in (self.timeout_path, *self._timeout_claim_paths()):
+            token = self._read_timeout_path(path)
+            if token is not None:
+                return token
+        return None
 
     def clear_timeout(self):
         """Remove a stale Android foreground-service timeout marker."""
-        try:
-            self.timeout_path.unlink()
-        except FileNotFoundError:
-            pass
+        for path in (self.timeout_path, *self._timeout_claim_paths()):
+            try:
+                path.unlink()
+            except FileNotFoundError:
+                pass
 
     def timeout_requested(self):
-        return self.timeout_path.is_file()
+        return self.timeout_path.is_file() or bool(self._timeout_claim_paths())
 
-    def consume_timeout(self):
-        """Remove and report one complete timeout marker exactly once."""
+    def _timeout_claim_path(self, expected_token):
+        digest = hashlib.sha256(str(expected_token).encode("utf-8")).hexdigest()
+        return self.base_dir / f"{self.TIMEOUT_CLAIM_PREFIX}{digest}"
+
+    def ack_timeout(self, expected_token):
+        """Delete only timeout evidence whose content matches expected_token."""
+        expected_token = str(expected_token)
+        for claim_path in self._timeout_claim_paths():
+            if self._read_timeout_path(claim_path) != expected_token:
+                continue
+            try:
+                claim_path.unlink()
+            except FileNotFoundError:
+                pass
+            return True
+
+        claim_path = self._timeout_claim_path(expected_token)
+        if claim_path.exists():
+            return False
         try:
-            self.timeout_path.unlink()
+            os.replace(self.timeout_path, claim_path)
         except FileNotFoundError:
             return False
+        if self._read_timeout_path(claim_path) != expected_token:
+            return False
+        try:
+            claim_path.unlink()
+        except FileNotFoundError:
+            pass
         return True
 
     def append_event(self, event):

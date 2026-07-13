@@ -339,15 +339,22 @@ class PrivateStorageTests(unittest.TestCase):
         state.clear_stop()
         self.assertFalse(state.stop_requested())
 
-    def test_timeout_marker_is_consumed_once_and_cleared_for_new_config(self):
+    def test_timeout_marker_read_is_non_destructive_and_ack_requires_expected_token(self):
         state = ServiceState(self.base_dir)
+        token = "11111111-1111-4111-8111-111111111111"
 
-        state.request_timeout()
+        state.request_timeout(token)
         self.assertTrue(state.timeout_requested())
-        self.assertTrue(state.consume_timeout())
-        self.assertFalse(state.consume_timeout())
+        self.assertEqual(state.read_timeout_token(), token)
+        self.assertEqual(state.read_timeout_token(), token)
+        self.assertFalse(
+            state.ack_timeout("22222222-2222-4222-8222-222222222222")
+        )
+        self.assertEqual(state.read_timeout_token(), token)
+        self.assertTrue(state.ack_timeout(token))
+        self.assertFalse(state.timeout_requested())
 
-        state.request_timeout()
+        state.request_timeout(token)
         state.write_config({"course_id": "new"})
         self.assertFalse(state.timeout_requested())
 
@@ -542,6 +549,12 @@ public class ServiceMonitor extends org.kivy.android.PythonService {
         self.assertIn("android.system.Os.open(", patched)
         self.assertIn("android.system.Os.fsync(directory)", patched)
         self.assertIn("android.system.Os.close(directory)", patched)
+        self.assertIn(
+            "java.util.UUID.randomUUID().toString()", patched
+        )
+        self.assertIn("timeoutToken", patched)
+        self.assertIn('output.write((timeoutToken + "\\n").getBytes', patched)
+        self.assertNotIn('output.write("timeout\\n"', patched)
         self.assertNotIn("Cookie", patched)
 
     def test_p4a_hook_fails_closed_when_generated_service_is_missing_or_unrecognized(self):
@@ -753,6 +766,87 @@ class ActivityUiTests(unittest.TestCase):
             self.assertFalse(module.restored_monitoring_state(
                 True, False, state.read_events(), timeout_requested=True
             ))
+
+    def test_timeout_append_failure_keeps_marker_and_restore_fail_closed(self):
+        module = self._activity_module()
+        token = "11111111-1111-4111-8111-111111111111"
+
+        class AppendFailState(ServiceState):
+            def append_event(self, event):
+                raise OSError("injected append failure")
+
+        with tempfile.TemporaryDirectory() as base_dir:
+            state = AppendFailState(base_dir)
+            state.request_timeout(token)
+
+            self.assertIsNone(module.consume_timeout_termination(state))
+            self.assertEqual(state.read_timeout_token(), token)
+            self.assertTrue(state.timeout_requested())
+            self.assertFalse(module.restored_monitoring_state(
+                True,
+                False,
+                state.read_events(),
+                timeout_requested=state.timeout_requested(),
+            ))
+
+    def test_timeout_retry_after_ack_failure_does_not_duplicate_event(self):
+        module = self._activity_module()
+        token = "11111111-1111-4111-8111-111111111111"
+
+        class AckOnceFailState(ServiceState):
+            def __init__(self, base_dir):
+                super().__init__(base_dir)
+                self.append_calls = 0
+                self.ack_calls = 0
+
+            def append_event(self, event):
+                self.append_calls += 1
+                super().append_event(event)
+
+            def ack_timeout(self, expected_token):
+                self.ack_calls += 1
+                if self.ack_calls == 1:
+                    raise OSError("injected ack failure")
+                return super().ack_timeout(expected_token)
+
+        with tempfile.TemporaryDirectory() as base_dir:
+            state = AckOnceFailState(base_dir)
+            state.request_timeout(token)
+
+            first = module.consume_timeout_termination(state)
+            self.assertTrue(state.timeout_requested())
+            second = module.consume_timeout_termination(state)
+
+            self.assertEqual(first["event_id"], second["event_id"])
+            self.assertEqual(state.append_calls, 1)
+            self.assertEqual(len(state.read_events()), 1)
+            self.assertFalse(state.timeout_requested())
+
+    def test_timeout_ack_does_not_delete_replaced_token(self):
+        module = self._activity_module()
+        original = "11111111-1111-4111-8111-111111111111"
+        replacement = "22222222-2222-4222-8222-222222222222"
+
+        class ReplacingAckState(ServiceState):
+            def __init__(self, base_dir):
+                super().__init__(base_dir)
+                self.replaced = False
+
+            def ack_timeout(self, expected_token):
+                if not self.replaced:
+                    self.replaced = True
+                    self.request_timeout(replacement)
+                return super().ack_timeout(expected_token)
+
+        with tempfile.TemporaryDirectory() as base_dir:
+            state = ReplacingAckState(base_dir)
+            state.request_timeout(original)
+
+            module.consume_timeout_termination(state)
+
+            self.assertTrue(state.timeout_requested())
+            self.assertEqual(state.read_timeout_token(), replacement)
+            self.assertEqual(len(state.read_events()), 1)
 
     def test_login_worker_helper_uses_verified_oauth_result_without_second_check(self):
         module = self._activity_module()

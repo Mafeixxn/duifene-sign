@@ -5,7 +5,7 @@ import json
 import threading
 import time
 from collections import Counter, deque
-from uuid import uuid4
+from uuid import NAMESPACE_URL, uuid5
 
 try:
     from .api_client import ApiClient
@@ -142,17 +142,45 @@ def restored_monitoring_state(
 
 
 def consume_timeout_termination(state):
-    """Consume Java's timeout marker and persist one user-visible terminal event."""
-    if not state.consume_timeout():
+    """Persist one terminal event, then acknowledge matching timeout evidence."""
+    token = state.read_timeout_token()
+    if token is None:
         return None
+    event_id = uuid5(NAMESPACE_URL, f"duifene-monitor-timeout:{token}").hex
+    existing = next(
+        (
+            event
+            for event in state.read_events()
+            if str(event.get("event_id", "")) == event_id
+        ),
+        None,
+    )
     event = {
-        "event_id": uuid4().hex,
+        "event_id": event_id,
         "level": "error",
         "message": TIMEOUT_EVENT_MESSAGE,
         "timestamp": int(time.time()),
     }
-    state.append_event(event)
-    return event
+    if existing is None:
+        try:
+            state.append_event(event)
+        except OSError:
+            pass
+        existing = next(
+            (
+                persisted
+                for persisted in state.read_events()
+                if str(persisted.get("event_id", "")) == event_id
+            ),
+            None,
+        )
+    if existing is None:
+        return None
+    try:
+        state.ack_timeout(token)
+    except OSError:
+        pass
+    return existing
 
 
 class EventIdentityTracker:
@@ -669,10 +697,13 @@ if KIVY_AVAILABLE:
         def _poll_events(self, _dt):
             if not self._visible:
                 return False
+            timeout_pending = self.service_state.timeout_requested()
             consume_timeout_termination(self.service_state)
             events = self.service_state.read_events()
             new_events = self._event_tracker.unseen(events)
-            lifecycle_seen = False
+            lifecycle_seen = timeout_pending
+            if timeout_pending:
+                self._monitoring = False
             for event in new_events:
                 self._append_log(
                     str(event.get("level", "info")),

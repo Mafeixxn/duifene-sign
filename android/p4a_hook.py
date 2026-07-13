@@ -14,6 +14,9 @@ TIMEOUT_MARKER = '"monitor.timeout"'
 
 TIMEOUT_OVERRIDE = r'''
 
+    private final String timeoutToken =
+        java.util.UUID.randomUUID().toString();
+
     @Override
     public void onTimeout(int startId, int fgsType) {
         java.io.File temporary = new java.io.File(
@@ -23,7 +26,9 @@ TIMEOUT_OVERRIDE = r'''
         try {
             try (java.io.FileOutputStream output =
                      new java.io.FileOutputStream(temporary, false)) {
-                output.write("timeout\n".getBytes(java.nio.charset.StandardCharsets.UTF_8));
+                output.write((timeoutToken + "\n").getBytes(
+                    java.nio.charset.StandardCharsets.UTF_8
+                ));
                 output.flush();
                 output.getFD().sync();
             }
