@@ -527,6 +527,11 @@ public class ServiceMonitor extends org.kivy.android.PythonService {
         self.assertIn('"monitor.timeout"', patched)
         self.assertIn("getFilesDir()", patched)
         self.assertIn("stopSelf(startId)", patched)
+        self.assertIn("android.system.OsConstants.O_RDONLY", patched)
+        self.assertNotIn("O_DIRECTORY", patched)
+        self.assertIn("android.system.Os.open(", patched)
+        self.assertIn("android.system.Os.fsync(directory)", patched)
+        self.assertIn("android.system.Os.close(directory)", patched)
         self.assertNotIn("Cookie", patched)
 
     def test_p4a_hook_fails_closed_when_generated_service_is_missing_or_unrecognized(self):

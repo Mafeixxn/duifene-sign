@@ -41,3 +41,21 @@ Branch: `codex/rebuild-android-app`
 - `python -m unittest android.tests.test_android_regressions -v`: exit 0; 60 tests total, with 59 passed and 1 Kivy smoke test skipped because Kivy is not installed.
 - `python -m compileall -q android` with `PYTHONPYCACHEPREFIX` directed to the host temporary directory: exit 0.
 - `git diff --check`: exit 0. Git emitted only existing line-ending and inaccessible global-ignore warnings, with no whitespace errors.
+
+## NDK 28c Controller Build Follow-up
+
+### RED
+
+- The controller's clean NDK 28c build reached `compileDebugJavaWithJavac` and failed because Android SDK's `android.system.OsConstants` does not expose `O_DIRECTORY`.
+- Added a minimal generated-source regression requiring `O_RDONLY`, forbidding `O_DIRECTORY`, and retaining parent-directory `Os.open`, `Os.fsync`, and `Os.close` calls.
+- Target command: `python -m unittest android.tests.test_android_regressions.ForegroundServiceTests.test_p4a_hook_patches_generated_service_idempotently -v`.
+- RED result: 1 test ran and failed at `assertNotIn("O_DIRECTORY", patched)` against the generated Java.
+
+### GREEN
+
+- Changed only the generated parent-directory open flags from `O_RDONLY | O_DIRECTORY` to Android SDK-compatible `O_RDONLY`.
+- Preserved temporary-file fsync, atomic `android.system.Os.rename`, parent-directory `open/fsync/finally close`, and `stopSelf(startId)` in the outer `finally`.
+- Target command: exit 0; 1 test passed.
+- Full regression command: exit 0; 60 tests total, with 59 passed and 1 existing Kivy smoke test skipped.
+- `python -m compileall -q android` with a temporary `PYTHONPYCACHEPREFIX`: exit 0.
+- `git diff --check`: exit 0 with no whitespace errors.

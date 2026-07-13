@@ -32,8 +32,7 @@ TIMEOUT_OVERRIDE = r'''
             );
             java.io.FileDescriptor directory = android.system.Os.open(
                 getFilesDir().getAbsolutePath(),
-                android.system.OsConstants.O_RDONLY
-                    | android.system.OsConstants.O_DIRECTORY,
+                android.system.OsConstants.O_RDONLY,
                 0
             );
             try {
