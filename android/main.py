@@ -5,6 +5,7 @@ import json
 import threading
 import time
 from collections import Counter, deque
+from pathlib import Path
 from uuid import NAMESPACE_URL, uuid5
 
 try:
@@ -21,6 +22,22 @@ except ImportError:  # python-for-android runs this file as a top-level module.
 
 DEFAULT_COUNTDOWN = 10
 SERVICE_CLASS = "org.example.duifene_sign.ServiceMonitor"
+APP_FONT_NAME = "NotoSansSC"
+APP_FONT_PATH = Path(__file__).resolve().parent / "assets" / "fonts" / "NotoSansSC.ttf"
+
+
+def panel_padding(top_inset=0, bottom_inset=0, density=1):
+    """Return Kivy's left, top, right, bottom padding with system insets."""
+    horizontal = 12 * density
+    vertical = 9 * density
+    return [
+        horizontal,
+        vertical + max(0, top_inset),
+        horizontal,
+        vertical + max(0, bottom_inset),
+    ]
+
+
 WECHAT_LOGIN_SUCCESS = "微信链接登录成功"
 TIMEOUT_EVENT_MESSAGE = "监控已停止：Android 前台服务达到系统时限。"
 
@@ -231,6 +248,7 @@ def event_moment(timestamp, now=datetime.datetime.now):
 try:
     from kivy.app import App
     from kivy.clock import Clock, mainthread
+    from kivy.core.text import LabelBase
     from kivy.graphics import Color, RoundedRectangle
     from kivy.metrics import dp
     from kivy.uix.boxlayout import BoxLayout
@@ -241,6 +259,21 @@ try:
     from kivy.uix.textinput import TextInput
     from kivy.utils import escape_markup, platform
 
+    LabelBase.register(
+        APP_FONT_NAME,
+        fn_regular=str(APP_FONT_PATH),
+        fn_bold=str(APP_FONT_PATH),
+        fn_italic=str(APP_FONT_PATH),
+        fn_bolditalic=str(APP_FONT_PATH),
+    )
+    # Kivy's built-in widgets and Spinner options default to the Roboto alias.
+    LabelBase.register(
+        "Roboto",
+        fn_regular=str(APP_FONT_PATH),
+        fn_bold=str(APP_FONT_PATH),
+        fn_italic=str(APP_FONT_PATH),
+        fn_bolditalic=str(APP_FONT_PATH),
+    )
     KIVY_AVAILABLE = True
 except ModuleNotFoundError as exc:
     if not (exc.name or "").startswith("kivy"):
@@ -322,6 +355,26 @@ if KIVY_AVAILABLE:
     C_WARNING = (0.88, 0.50, 0.08, 1)
     C_DISABLED = (0.67, 0.69, 0.72, 1)
 
+    def _android_system_insets():
+        """Read enforced edge-to-edge insets on Android 15 and newer."""
+        if platform != "android":
+            return 0, 0
+        try:
+            from jnius import autoclass
+
+            sdk_int = autoclass("android.os.Build$VERSION").SDK_INT
+            if sdk_int < 35:
+                return 0, 0
+            activity = autoclass("org.kivy.android.PythonActivity").mActivity
+            root_insets = activity.getWindow().getDecorView().getRootWindowInsets()
+            if root_insets is None:
+                return 0, 0
+            inset_type = autoclass("android.view.WindowInsets$Type")
+            bars = root_insets.getInsets(inset_type.systemBars())
+            return max(0, int(bars.top)), max(0, int(bars.bottom))
+        except Exception:
+            return 0, 0
+
     def _paint(widget, color, radius=8):
         widget.canvas.before.clear()
         with widget.canvas.before:
@@ -343,6 +396,7 @@ if KIVY_AVAILABLE:
     def _button(text, color=C_PRIMARY):
         button = Button(
             text=text,
+            font_name=APP_FONT_NAME,
             bold=True,
             font_size=dp(14),
             size_hint_y=None,
@@ -351,12 +405,14 @@ if KIVY_AVAILABLE:
             background_down="",
             background_color=color,
             color=(1, 1, 1, 1),
+            disabled_color=(1, 1, 1, 0.9),
         )
         return button
 
     def _input(**kwargs):
         return TextInput(
             multiline=False,
+            font_name=APP_FONT_NAME,
             font_size=dp(14),
             size_hint_y=None,
             height=dp(42),
@@ -365,6 +421,7 @@ if KIVY_AVAILABLE:
             background_active="",
             background_color=(0.96, 0.97, 0.98, 1),
             foreground_color=C_TEXT,
+            disabled_foreground_color=C_MUTED,
             hint_text_color=C_MUTED,
             cursor_color=C_PRIMARY,
             **kwargs,
@@ -385,7 +442,7 @@ if KIVY_AVAILABLE:
             super().__init__(**kwargs)
             install_crash_hooks(base_dir)
             self.orientation = "vertical"
-            self.padding = [dp(12), dp(9)]
+            self.padding = panel_padding(density=dp(1))
             self.spacing = dp(8)
             self.api_factory = api_factory
             self.bridge = service_bridge or AndroidServiceBridge()
@@ -405,6 +462,7 @@ if KIVY_AVAILABLE:
             self.bind(size=lambda widget, _value: _paint(widget, C_BG, 0))
             self._build()
             self._sync_controls()
+            Clock.schedule_once(self._apply_system_insets, 0)
             if auto_restore:
                 self._begin_restore()
 
@@ -454,10 +512,12 @@ if KIVY_AVAILABLE:
                 text="登录后选择课程",
                 values=(),
                 font_size=dp(14),
+                font_name=APP_FONT_NAME,
                 size_hint_x=0.72,
                 background_normal="",
                 background_color=(0.96, 0.97, 0.98, 1),
                 color=C_TEXT,
+                disabled_color=C_MUTED,
             )
             self.course_spinner.bind(text=self._on_course_select)
             self.countdown_input = _input(text=str(DEFAULT_COUNTDOWN), input_filter="int")
@@ -496,6 +556,10 @@ if KIVY_AVAILABLE:
             scroll.add_widget(self.log_label)
             log_card.add_widget(scroll)
             self.add_widget(log_card)
+
+        def _apply_system_insets(self, _dt=0):
+            top, bottom = _android_system_insets()
+            self.padding = panel_padding(top, bottom, density=dp(1))
 
         def _schedule(self, callback, *args):
             Clock.schedule_once(lambda _dt: callback(*args), 0)
@@ -670,6 +734,7 @@ if KIVY_AVAILABLE:
 
         def on_visible(self):
             self._visible = True
+            Clock.schedule_once(self._apply_system_insets, 0)
             self._restore_monitoring_state()
             self._poll_events(0)
             if self._event_timer is None:

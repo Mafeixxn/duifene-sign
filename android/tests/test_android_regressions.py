@@ -952,6 +952,30 @@ class ActivityUiTests(unittest.TestCase):
         self.assertIsInstance(module.KIVY_AVAILABLE, bool)
         self.assertTrue(callable(module.normalize_countdown))
 
+    def test_android_ui_bundles_and_registers_a_chinese_font(self):
+        module = self._activity_module()
+        android_dir = Path(module.__file__).resolve().parent
+        font_path = android_dir / "assets" / "fonts" / "NotoSansSC.ttf"
+        spec_path = android_dir / "buildozer.spec"
+        parser = configparser.ConfigParser(interpolation=None)
+        parser.read(spec_path, encoding="utf-8")
+        include_exts = {
+            item.strip() for item in parser["app"]["source.include_exts"].split(",")
+        }
+        source = inspect.getsource(module)
+
+        self.assertTrue(font_path.is_file())
+        self.assertGreater(font_path.stat().st_size, 1_000_000)
+        self.assertIn("ttf", include_exts)
+        self.assertIn("LabelBase.register", source)
+        self.assertIn("NotoSansSC.ttf", source)
+
+    def test_android_15_system_insets_are_applied_to_panel_padding(self):
+        module = self._activity_module()
+
+        self.assertEqual(module.panel_padding(0, 0, density=2), [24, 18, 24, 18])
+        self.assertEqual(module.panel_padding(48, 72, density=2), [24, 66, 24, 90])
+
     def test_activity_source_has_no_password_login_surface(self):
         source = inspect.getsource(self._activity_module()).lower()
 

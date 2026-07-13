@@ -3,7 +3,7 @@ title = 对分易签到
 package.name = duifene_sign
 package.domain = org.example
 source.dir = .
-source.include_exts = py,png,jpg,kv,atlas,txt
+source.include_exts = py,png,jpg,kv,atlas,txt,ttf
 source.exclude_patterns = p4a_hook.py,cookie.txt,monitor.json,monitor.stop,monitor.timeout,monitor-events.jsonl,crash.log,crash-*.log,.cookie.txt.*.tmp,.monitor.json.*.tmp,.monitor.stop.*.tmp,.monitor.timeout.tmp,.monitor.timeout.*.tmp,.monitor-events.jsonl.*.tmp,.crash.log.*.tmp,.crash-*.log.*.tmp,tests/*,.buildozer/*,bin/*,build/*,dist/*,**/__pycache__/*
 version = 1.1
 requirements = python3,kivy==2.3.1,requests==2.34.2
