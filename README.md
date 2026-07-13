@@ -47,7 +47,7 @@
 
 | 版本 | 适用平台 | 获取方式 | 适合场景 |
 |------|----------|----------|----------|
-| Android APK | Android 7.0+ | 下载 [`android/duifene_sign.apk`](android/duifene_sign.apk) | 手机直接安装使用 |
+| Android APK | Android 10+ (API 29) | 下载 [`android/duifene_sign.apk`](android/duifene_sign.apk) | 手机直接安装使用 |
 | Windows 桌面版 | Windows 10 / 11 | [GitHub Releases](../../releases) 下载 exe，或克隆仓库运行源码 | 桌面监听、调试和打包 |
 
 ## ✨ 功能特性
@@ -220,3 +220,14 @@ python main.py
 ## 📄 License
 
 [![MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+
+## Android 10+ Usage Notes
+
+Android 版本需要 **Android 10（API 29）或更高版本**，仅支持通过微信 OAuth 回调链接登录。程序不提供账号、密码登录入口；请按上文步骤将微信中复制的 OAuth 链接粘贴到应用中。
+
+开始监听后，应用会启动一个前台服务并显示持续通知。这使监听在应用转入后台或设备锁屏后仍能继续；请保留该通知，并不要从系统设置中强行停止应用。
+
+Android 13 及更高版本在首次开始监听前会请求「通知」权限，请选择允许。若权限被拒绝、通知被关闭，或系统限制了后台活动，监听可能会被中断。
+
+> [!TIP]
+> 为获得较可靠的后台行为，请将本应用设为允许后台运行，并在手机的电池优化、节电、自启动、任务清理等设置中排除或允许它。不同厂商的系统策略不同，无法保证在所有设备上都不会被系统停止。

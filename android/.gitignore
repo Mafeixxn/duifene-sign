@@ -1,0 +1,18 @@
+# App-private runtime data
+cookie.txt
+monitor.json
+monitor.stop
+monitor-events.jsonl
+.cookie.txt.*.tmp
+.monitor.json.*.tmp
+.monitor.stop.*.tmp
+.monitor-events.jsonl.*.tmp
+
+# Local crash diagnostics
+crash.log
+crash-*.log
+*.crash
+
+# Buildozer output
+.buildozer/
+bin/
