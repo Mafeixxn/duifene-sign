@@ -47,8 +47,11 @@
 
 | 版本 | 适用平台 | 获取方式 | 适合场景 |
 |------|----------|----------|----------|
-| Android APK | Android 10+ (API 29) | 下载 [`android/duifene_sign.apk`](android/duifene_sign.apk) | 手机直接安装使用 |
-| Windows 桌面版 | Windows 10 / 11 | [GitHub Releases](../../releases) 下载 exe，或克隆仓库运行源码 | 桌面监听、调试和打包 |
+| Android APK | Android 10+ (API 29) | [下载最新 APK](https://github.com/Mafeixxn/duifene-sign/releases/latest/download/duifene_sign.apk)，或下载仓库中的 [`android/duifene_sign.apk`](android/duifene_sign.apk) | 手机直接安装使用 |
+| Windows 桌面版 | Windows 10 / 11 | [下载最新 EXE](https://github.com/Mafeixxn/duifene-sign/releases/latest/download/%E5%AF%B9%E5%88%86%E6%98%93%E8%87%AA%E5%8A%A8%E7%AD%BE%E5%88%B0.exe)，或进入 [GitHub Releases](../../releases) | 桌面监听与签到 |
+
+> [!TIP]
+> 推荐从 [最新 Release](../../releases/latest) 下载。每个 Release 会同时提供 Windows EXE 和 Android APK，无需安装 Python 或自行构建。
 
 ## ✨ 功能特性
 
@@ -59,7 +62,10 @@
 | 配置保护 | Windows 版使用本地 `duifenyi.ini` 保存运行配置，仓库仅保留 `duifenyi.example.ini` 模板。 |
 | 课程选择 | 自动拉取课程列表，支持切换目标课程。 |
 | 提前签到 | 可设置倒计时提前量，提前尝试完成签到。 |
+| 倒计时日志 | 检测到签到活动后显示剩余秒数，并在达到设定值时开始签到。 |
 | 签到通知 | Windows 版支持桌面通知提醒签到结果。 |
+| 后台监听 | Android 版使用前台服务，在切到后台或锁屏后继续监听。 |
+| 中文移动界面 | Android 版内置中文字体并适配 Android 15 系统状态栏。 |
 | 多端支持 | 提供 Windows tkinter 桌面版和 Android Kivy 版。 |
 
 ## 📋 签到类型支持
@@ -73,7 +79,7 @@
 ## 🖥️ Windows 桌面版使用
 
 > [!IMPORTANT]
-> 如果直接下载 exe，可以跳过“安装依赖”和“启动程序”，直接从“登录方式”开始。
+> 直接下载并运行 [对分易自动签到.exe](https://github.com/Mafeixxn/duifene-sign/releases/latest/download/%E5%AF%B9%E5%88%86%E6%98%93%E8%87%AA%E5%8A%A8%E7%AD%BE%E5%88%B0.exe)，可以跳过“安装依赖”和“启动程序”，直接从“登录方式”开始。
 
 ### 1. 安装依赖
 
@@ -121,17 +127,21 @@ python main.py
 
 ### 直接安装
 
-下载 [`android/duifene_sign.apk`](android/duifene_sign.apk) 并安装到 Android 手机即可
+从 [GitHub Releases 下载最新 APK](https://github.com/Mafeixxn/duifene-sign/releases/latest/download/duifene_sign.apk)，或下载仓库中的 [`android/duifene_sign.apk`](android/duifene_sign.apk)，然后安装到 Android 手机即可。
 
-具体步骤
+首次安装时，Android 可能提示“允许安装未知应用”；请只安装本项目 Release 页面或仓库中提供的 APK。覆盖安装新版前建议先停止监听。
 
-1.在微信将上面链接发到聊天里面(或者收藏),然后点开,出现一个PDF文件预览画面(无内容)
+具体步骤：
 
-2.点开右上角三个点,在浏览器打开
+1. 在微信中将上面的 OAuth 链接发送到聊天（或收藏），然后点开，进入 PDF 文件预览页面（内容可能为空）
 
-3.然后复制浏览器里面的链接
+2. 点击右上角三个点，选择在浏览器中打开
 
-4.将链接粘贴到本软件的oauth链接输入框,点微信登录
+3. 复制浏览器地址栏中的完整链接
+
+4. 将链接粘贴到软件的「微信 OAuth 链接」输入框，点击「登录并加载课程」
+
+5. 选择课程、填写倒计时提前量并开始监听；检测到签到后，运行记录会显示剩余秒数和签到结果
 
 
 ### 自行构建 APK
@@ -177,7 +187,7 @@ python main.py
 
 ## 🔧 自动构建
 
-推送版本标签（`v*`）后，GitHub Actions 会自动构建 Windows exe 并发布到 [Releases](../../releases)，同时附带预构建的 Android APK
+推送版本标签（`v*`）后，GitHub Actions 会自动构建 Windows EXE，并将它和仓库中的预构建 Android APK 一起发布到 [Releases](../../releases)。Release 附件名称固定为 `对分易自动签到.exe` 和 `duifene_sign.apk`，README 的“最新下载”链接会自动指向最新版本。
 
 > [!TIP]
 > 发布前建议确认：
