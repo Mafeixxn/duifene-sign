@@ -48,7 +48,7 @@
 | 版本 | 适用平台 | 获取方式 | 适合场景 |
 |------|----------|----------|----------|
 | Android APK | Android 10+ (API 29) | [下载最新 APK](https://github.com/Mafeixxn/duifene-sign/releases/latest/download/duifene_sign.apk)，或下载仓库中的 [`android/duifene_sign.apk`](android/duifene_sign.apk) | 手机直接安装使用 |
-| Windows 桌面版 | Windows 10 / 11 | [下载最新 EXE](https://github.com/Mafeixxn/duifene-sign/releases/latest/download/%E5%AF%B9%E5%88%86%E6%98%93%E8%87%AA%E5%8A%A8%E7%AD%BE%E5%88%B0.exe)，或进入 [GitHub Releases](../../releases) | 桌面监听与签到 |
+| Windows 桌面版 | Windows 10 / 11 | [下载最新 EXE](https://github.com/Mafeixxn/duifene-sign/releases/latest/download/duifene_sign_windows.exe)，或进入 [GitHub Releases](../../releases) | 桌面监听与签到 |
 
 > [!TIP]
 > 推荐从 [最新 Release](../../releases/latest) 下载。每个 Release 会同时提供 Windows EXE 和 Android APK，无需安装 Python 或自行构建。
@@ -79,7 +79,7 @@
 ## 🖥️ Windows 桌面版使用
 
 > [!IMPORTANT]
-> 直接下载并运行 [对分易自动签到.exe](https://github.com/Mafeixxn/duifene-sign/releases/latest/download/%E5%AF%B9%E5%88%86%E6%98%93%E8%87%AA%E5%8A%A8%E7%AD%BE%E5%88%B0.exe)，可以跳过“安装依赖”和“启动程序”，直接从“登录方式”开始。
+> 直接下载并运行 [duifene_sign_windows.exe](https://github.com/Mafeixxn/duifene-sign/releases/latest/download/duifene_sign_windows.exe)，可以跳过“安装依赖”和“启动程序”，直接从“登录方式”开始。
 
 ### 1. 安装依赖
 
@@ -187,7 +187,7 @@ python main.py
 
 ## 🔧 自动构建
 
-推送版本标签（`v*`）后，GitHub Actions 会自动构建 Windows EXE，并将它和仓库中的预构建 Android APK 一起发布到 [Releases](../../releases)。Release 附件名称固定为 `对分易自动签到.exe` 和 `duifene_sign.apk`，README 的“最新下载”链接会自动指向最新版本。
+推送版本标签（`v*`）后，GitHub Actions 会自动构建 Windows EXE，并将它和仓库中的预构建 Android APK 一起发布到 [Releases](../../releases)。Release 附件名称固定为 `duifene_sign_windows.exe` 和 `duifene_sign.apk`，README 的“最新下载”链接会自动指向最新版本。
 
 > [!TIP]
 > 发布前建议确认：

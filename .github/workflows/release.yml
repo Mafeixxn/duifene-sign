@@ -24,12 +24,12 @@ jobs:
       - name: Build exe
         run: |
           cd windows
-          pyinstaller --onefile --windowed --name "对分易自动签到" --hidden-import lxml --hidden-import plyer "对分易签到.pyw"
+          pyinstaller --onefile --windowed --name "duifene_sign_windows" --hidden-import lxml --hidden-import plyer "对分易签到.pyw"
 
       - uses: actions/upload-artifact@v4
         with:
           name: windows-exe
-          path: windows/dist/对分易自动签到.exe
+          path: windows/dist/duifene_sign_windows.exe
 
   release:
     needs: build-windows
@@ -48,5 +48,5 @@ jobs:
         with:
           files: |
             android/duifene_sign.apk
-            windows-exe/对分易自动签到.exe
+            windows-exe/duifene_sign_windows.exe
           generate_release_notes: true
