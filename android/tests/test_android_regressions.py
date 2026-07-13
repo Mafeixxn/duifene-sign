@@ -480,6 +480,7 @@ class ForegroundServiceTests(unittest.TestCase):
         }
 
         required = {
+            "p4a_hook.py",
             "cookie.txt",
             "monitor.json",
             "monitor.stop",
@@ -503,7 +504,16 @@ class ForegroundServiceTests(unittest.TestCase):
             "**/__pycache__/*",
         }
         self.assertTrue(required.issubset(patterns))
-        self.assertTrue({"*.png", "*.jpg", "main.py", "service/*"}.isdisjoint(patterns))
+        self.assertTrue(
+            {
+                "*.py",
+                "**/*.py",
+                "*.png",
+                "*.jpg",
+                "main.py",
+                "service/*",
+            }.isdisjoint(patterns)
+        )
 
     def test_p4a_hook_patches_generated_service_idempotently(self):
         from android.p4a_hook import patch_service_java

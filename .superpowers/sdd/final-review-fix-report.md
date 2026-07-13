@@ -59,3 +59,20 @@ Branch: `codex/rebuild-android-app`
 - Full regression command: exit 0; 60 tests total, with 59 passed and 1 existing Kivy smoke test skipped.
 - `python -m compileall -q android` with a temporary `PYTHONPYCACHEPREFIX`: exit 0.
 - `git diff --check`: exit 0 with no whitespace errors.
+
+## APK private.tar Hook Exclusion Follow-up
+
+### RED
+
+- Controller inspection found build-only `p4a_hook.pyc` inside the APK's `private.tar`; all previously listed sensitive, test, and build files were already absent.
+- Extended the existing Buildozer exclusion regression to require the exact `p4a_hook.py` pattern and to reject broad `*.py` or `**/*.py` exclusions.
+- Target command: `python -m unittest android.tests.test_android_regressions.ForegroundServiceTests.test_buildozer_excludes_only_private_runtime_test_and_build_files -v`.
+- RED result: 1 test ran and failed because `p4a_hook.py` was not in `source.exclude_patterns`.
+
+### GREEN
+
+- Added only `p4a_hook.py` to `source.exclude_patterns`; normal application Python sources remain included.
+- Target command: exit 0; 1 test passed.
+- Full regression command: exit 0; 60 tests total, with 59 passed and 1 existing Kivy smoke test skipped.
+- `python -m compileall -q android` with a temporary `PYTHONPYCACHEPREFIX`: exit 0.
+- `git diff --check`: exit 0 with no whitespace errors.
