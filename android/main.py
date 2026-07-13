@@ -134,6 +134,39 @@ def lifecycle_monitoring_state(message):
     return None
 
 
+def service_bridge_callback_log(success, message, failure_level):
+    """Return only bridge failures; the service owns successful lifecycle events."""
+    if success:
+        return None
+    return str(failure_level), str(message)
+
+
+def localized_log_message(message):
+    """Translate stable internal service messages at the presentation boundary."""
+    message = str(message)
+    exact = {
+        "Monitoring started.": "监听已启动。",
+        "Monitoring stopped.": "监听已停止。",
+        "Monitoring stopped before service startup.": "监听在服务启动前已停止。",
+        "Monitoring configuration is unavailable.": "监听配置不可用。",
+        "Login expired; polling stopped.": "登录已失效，监听已停止。",
+        "Unable to refresh course context.": "无法刷新课程状态。",
+        "Notification permission is required.": "需要通知权限才能启动监听。",
+    }
+    if message in exact:
+        return exact[message]
+    prefixes = {
+        "Polling request failed:": "监听请求失败：",
+        "Monitoring service failed:": "监听服务异常：",
+        "Unable to start monitor:": "无法启动监听：",
+        "Unable to stop monitor:": "无法停止监听：",
+    }
+    for prefix, replacement in prefixes.items():
+        if message.startswith(prefix):
+            return replacement + message[len(prefix):].lstrip()
+    return message
+
+
 def apply_lifecycle_events(monitoring, events):
     """Apply lifecycle events in emission order and return the resulting state."""
     monitoring = bool(monitoring)
@@ -676,7 +709,9 @@ if KIVY_AVAILABLE:
             if not success:
                 self.service_state.request_stop()
             self._set_service_busy(False)
-            self._append_log("success" if success else "error", message)
+            callback_log = service_bridge_callback_log(success, message, "error")
+            if callback_log is not None:
+                self._append_log(*callback_log)
 
         def _stop_monitoring(self):
             self.service_state.request_stop()
@@ -692,7 +727,9 @@ if KIVY_AVAILABLE:
         def _finish_service_stop(self, success, message):
             self._monitoring = False
             self._set_service_busy(False)
-            self._append_log("info" if success else "warn", message)
+            callback_log = service_bridge_callback_log(success, message, "warn")
+            if callback_log is not None:
+                self._append_log(*callback_log)
 
         @mainthread
         def _set_auth_busy(self, busy, status=None):
@@ -795,7 +832,8 @@ if KIVY_AVAILABLE:
             moment = event_moment(timestamp)
             line = (
                 f"[color=#{colors.get(level, '4B647A')}]"
-                f"[{moment:%H:%M:%S}][/color] {escape_markup(str(message))}"
+                f"[{moment:%H:%M:%S}][/color] "
+                f"{escape_markup(localized_log_message(message))}"
             )
             lines = (self.log_label.text.splitlines() + [line])[-160:]
             self.log_label.text = "\n".join(lines)

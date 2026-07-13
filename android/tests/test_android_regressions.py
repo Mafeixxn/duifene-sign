@@ -725,6 +725,27 @@ class ActivityUiTests(unittest.TestCase):
             with self.subTest(message=message):
                 self.assertIsNone(module.lifecycle_monitoring_state(message))
 
+    def test_successful_service_bridge_callbacks_do_not_duplicate_service_events(self):
+        callback_log = self._activity_module().service_bridge_callback_log
+
+        self.assertIsNone(callback_log(True, "Monitoring started.", "error"))
+        self.assertIsNone(callback_log(True, "Monitoring stopped.", "warn"))
+        self.assertEqual(
+            callback_log(False, "Unable to start monitor: denied", "error"),
+            ("error", "Unable to start monitor: denied"),
+        )
+
+    def test_lifecycle_messages_are_localized_only_for_display(self):
+        localized = self._activity_module().localized_log_message
+
+        self.assertEqual(localized("Monitoring started."), "监听已启动。")
+        self.assertEqual(localized("Monitoring stopped."), "监听已停止。")
+        self.assertEqual(
+            localized("Polling request failed: timed out"),
+            "监听请求失败：timed out",
+        )
+        self.assertEqual(localized("custom course message"), "custom course message")
+
     def test_restored_monitoring_state_ignores_transient_failures(self):
         restored_monitoring_state = self._activity_module().restored_monitoring_state
         events = [
