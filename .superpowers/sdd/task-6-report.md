@@ -22,9 +22,9 @@ outstanding.
 | Build result | PASS: `BUILD SUCCESSFUL`, `Android packaging done`, and APK availability recorded in the build log |
 | NDK | Clean NDK `28c` build |
 | APK | `android/duifene_sign.apk` |
-| Size | `21,433,319` bytes |
-| Windows SHA256 | `4E5ED6161D3CCE4474B2DA0BAE893FD4DDE9EDDC8FB8EC118080A141ABB21336` |
-| Java/Gradle | Generated `ServiceMonitor.java` includes `onTimeout(int startId, int fgsType)`; Javac and Gradle completed successfully |
+| Size | `21,435,435` bytes |
+| Windows SHA256 | `A9A9D67CB70EA13F5370020F780A09F773D0EBCA98099C9926C73E4894075706` |
+| Java/Gradle | Generated `ServiceMonitor.java` includes UUID-token `onTimeout(int startId, int fgsType)`; Javac and Gradle completed successfully |
 
 ## APK Verification
 
@@ -45,10 +45,20 @@ outstanding.
 ## Timeout Hook Verification
 
 The generated `ServiceMonitor.java` hook implements
-`onTimeout(int startId, int fgsType)`. It atomically writes `monitor.timeout`,
-fsyncs the temporary file and parent directory, and calls `stopSelf(startId)`
-in `finally`. Javac and Gradle success during the clean build verify the
-generated Java compiles and packages.
+`onTimeout(int startId, int fgsType)` with one stable UUID token per service
+lifetime. It atomically writes the token-bearing `monitor.timeout`, fsyncs the
+temporary file and parent directory, and calls `stopSelf(startId)` in `finally`.
+Javac and Gradle success during the clean build verify the generated Java
+compiles and packages. The fail-open fault-injection window was fixed by
+retaining timeout evidence until the terminal event has been durably recorded
+and acknowledged.
+
+## Regression Verification
+
+The final regression suite ran `63` tests: `62` passed and `1` Kivy smoke test
+was skipped because Kivy is not installed on this host. The UUID fail-closed
+fault-injection cases cover failed event append, acknowledgement retry,
+marker replacement during acknowledgement, and stable token generation.
 
 ## Remaining Device Risk
 

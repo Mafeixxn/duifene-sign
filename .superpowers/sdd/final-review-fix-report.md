@@ -12,8 +12,8 @@ Gradle packaging. The final artifact is `android/duifene_sign.apk`:
 
 | Item | Value |
 | --- | --- |
-| Size | `21,433,319` bytes |
-| Windows SHA256 | `4E5ED6161D3CCE4474B2DA0BAE893FD4DDE9EDDC8FB8EC118080A141ABB21336` |
+| Size | `21,435,435` bytes |
+| Windows SHA256 | `A9A9D67CB70EA13F5370020F780A09F773D0EBCA98099C9926C73E4894075706` |
 | Package | `org.example.duifene_sign` |
 | Version | versionCode `1029101`; versionName `1.1` |
 | SDK | minSdk `29`; targetSdk `35` |
@@ -21,10 +21,11 @@ Gradle packaging. The final artifact is `android/duifene_sign.apk`:
 
 ## Generated Service Timeout Hook
 
-The clean build generated `ServiceMonitor.java` with
-`onTimeout(int startId, int fgsType)`. The override atomically writes
-`monitor.timeout`, fsyncs the file and parent directory, and invokes
-`stopSelf(startId)` in `finally`. Javac and Gradle completed successfully.
+The clean NDK 28c build generated `ServiceMonitor.java` with UUID-token
+`onTimeout(int startId, int fgsType)`. The override retains one stable UUID for
+the service lifetime, atomically writes `monitor.timeout`, fsyncs the file and
+parent directory, and invokes `stopSelf(startId)` in `finally`. Javac and
+Gradle completed successfully.
 
 ## Final APK Inspection
 
@@ -51,9 +52,9 @@ permission handling, and foreground monitoring while backgrounded or locked
 remain outstanding. The Android 15 `dataSync` timeout is system-managed and
 needs API 35 device/system validation for full runtime coverage.
 
-## Final Fail-Closed Timeout Evidence Fix
+## Final UUID Fail-Closed Timeout Evidence Fix
 
-The final review found a consume-before-append failure window: deleting
+The final review found a fail-open, consume-before-append failure window: deleting
 `monitor.timeout` before persisting its terminal event could lose the only
 timeout evidence and restore the UI to a monitoring state after an `OSError`
 or process interruption.
@@ -93,6 +94,8 @@ and stable Java UUID generation.
 
 ### Residual Risk Update
 
-The fault windows are covered with platform-neutral tests, but final validation
-of Android framework callback timing and filesystem behavior still requires an
-API 35 device. The APK was intentionally not rebuilt or modified in this fix.
+The fault windows are covered with platform-neutral tests, and the final APK
+was rebuilt cleanly with NDK 28c after the fix. Javac/Gradle packaging,
+`apksigner` v2, `zipalign -c -P 16 -v 4`, true-ELF `0x4000` LOAD alignment, and
+the `private.tar` exclusions all passed. Final validation of Android framework
+callback timing and filesystem behavior still requires an API 35 device.
