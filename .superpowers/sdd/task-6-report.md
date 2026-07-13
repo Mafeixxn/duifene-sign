@@ -2,11 +2,16 @@
 
 ## Status
 
-Documentation and packaging-ignore work is complete on `codex/rebuild-android-app`.
-APK construction and device verification remain outstanding because this Windows
-host has no installed WSL distribution, Buildozer, or ADB.
+Documentation, packaging-ignore work, and the Android APK build are complete on
+`codex/rebuild-android-app`. The APK was built successfully with Buildozer 1.6.0
+on Ubuntu 22.04; the build log contains `BUILD SUCCESSFUL` and `APK available`.
+Device installation and background/lock-screen verification remain outstanding
+because Windows PATH has no `adb` and there is no connected ADB target.
 
-Committed task-owned repository changes: `6daf66f` (`Document Android foreground monitoring`).
+Task 6 commits: `6daf66f` (`Document Android foreground monitoring`), `527b2d5`
+(`docs: localize Android usage notes heading`), `7dfe927`
+(`fix(android): omit empty Gradle dependencies`), and `6b7503a`
+(`build(android): record verified debug APK`) for `android/duifene_sign.apk`.
 
 ## Changed Files
 
@@ -27,25 +32,50 @@ Committed task-owned repository changes: `6daf66f` (`Document Android foreground
 
 ## Verification
 
+### Android APK Build Evidence
+
+| Item | Result |
+| --- | --- |
+| Build environment | Ubuntu 22.04; Buildozer 1.6.0 |
+| Build command | `buildozer android debug` |
+| Build log | PASS: `BUILD SUCCESSFUL`; `APK available` |
+| APK | `android/duifene_sign.apk` |
+| Size | 21,085,355 bytes |
+| SHA256 | `AA52140FBDF29BF72BEC944603C2FD80036420F389C5A16F05D6A429E217363A` |
+| Package metadata | `org.example.duifene_sign`, version `1.1`, minSdk `29`, targetSdk `35`, ABI `arm64-v8a` |
+| Permissions and service | `INTERNET`, `ACCESS_NETWORK_STATE`, `FOREGROUND_SERVICE`, `FOREGROUND_SERVICE_DATA_SYNC`, and `POST_NOTIFICATIONS`; `ServiceMonitor` foreground service type `dataSync` |
+| Signature | `apksigner` verification PASS: v2 debug signature |
+
+The following commands were used from an Ubuntu Android SDK/build-tools
+environment to review the committed APK; their output recorded the values
+above:
+
+```sh
+aapt dump badging android/duifene_sign.apk
+# package: name='org.example.duifene_sign' versionCode='11' versionName='1.1'
+# sdkVersion:'29'; targetSdkVersion:'35'; native-code: 'arm64-v8a'
+# uses-permission: INTERNET, ACCESS_NETWORK_STATE, FOREGROUND_SERVICE,
+#   FOREGROUND_SERVICE_DATA_SYNC, POST_NOTIFICATIONS
+aapt dump xmltree android/duifene_sign.apk AndroidManifest.xml
+# ServiceMonitor has android:foregroundServiceType="dataSync"
+apksigner verify --verbose --print-certs android/duifene_sign.apk
+# Verified using v2 scheme (APK Signature Scheme v2: true)
+```
+
 Run from `F:\成品\安卓版签到`:
 
 | Command | Result |
 | --- | --- |
-| `python -m unittest android.tests.test_android_regressions -v` | PASS: 44 tests ran; 43 passed and 1 expected skip because Kivy is not installed on this host. |
+| `python -m unittest android.tests.test_android_regressions -v` | PASS: 45 tests ran; 44 passed and 1 expected Kivy skip because Kivy is not installed on this host. |
 | `python -m compileall -q android` | Initial direct run was blocked by sandbox permission errors while writing existing repository `__pycache__` directories. Re-ran with `PYTHONPYCACHEPREFIX=$env:TEMP`; PASS with exit code 0. |
 | `git -c safe.directory='F:/成品/安卓版签到' diff --check` | PASS with exit code 0. Git emitted only existing LF-to-CRLF conversion warnings for `.gitignore` and `README.md`. |
-| `wsl -l -v` | BLOCKED: `wsl.exe` is installed, but no Linux distribution is installed. |
-| `Get-Command buildozer` | BLOCKED: unavailable. |
-| `Get-Command adb` | BLOCKED: unavailable. |
+| `Get-Command adb`; `adb devices` | OUTSTANDING: Windows PATH has no `adb`, and no connected ADB target is available for device verification. |
 
 ## Blockers
 
-- No installed Linux/WSL distribution with JDK, Android SDK, Android NDK, and
-  Buildozer. `buildozer android debug` was not run, so no rebuilt APK path or
-  SHA256 can be recorded.
-- No ADB executable or connected target. Installation, notification permission
-  grant, background/lock foreground-notification verification, and continued
-  event-output verification are outstanding.
+- Windows PATH has no `adb`, and there is no connected ADB target. Installation,
+  notification-permission grant, background/lock foreground-notification
+  verification, and continued event-output verification are outstanding.
 - Kivy is not installed on this host, so the Kivy-only widget construction
   smoke test is skipped; the complete desktop regression suite otherwise passes.
 
