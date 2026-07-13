@@ -5,6 +5,8 @@
 Documentation, packaging-ignore work, and the Android APK build are complete on
 `codex/rebuild-android-app`. The APK was built successfully with Buildozer 1.6.0
 on Ubuntu 22.04; the build log contains `BUILD SUCCESSFUL` and `APK available`.
+The original successful `buildozer android debug` transcript that generated the
+current APK is retained at [`.superpowers/sdd/task-6-build.log`](task-6-build.log).
 Device installation and background/lock-screen verification remain outstanding
 because Windows PATH has no `adb` and there is no connected ADB target.
 
@@ -38,11 +40,11 @@ Task 6 commits: `6daf66f` (`Document Android foreground monitoring`), `527b2d5`
 | --- | --- |
 | Build environment | Ubuntu 22.04; Buildozer 1.6.0 |
 | Build command | `buildozer android debug` |
-| Build log | PASS: `BUILD SUCCESSFUL`; `APK available` |
+| Build log | PASS: [`.superpowers/sdd/task-6-build.log`](task-6-build.log), the original successful `buildozer android debug` transcript for the current APK; it contains `BUILD SUCCESSFUL`, `Android packaging done`, and `APK available` |
 | APK | `android/duifene_sign.apk` |
 | Size | 21,085,355 bytes |
 | SHA256 | `AA52140FBDF29BF72BEC944603C2FD80036420F389C5A16F05D6A429E217363A` |
-| Package metadata | `org.example.duifene_sign`, version `1.1`, minSdk `29`, targetSdk `35`, ABI `arm64-v8a` |
+| Package metadata | `org.example.duifene_sign`, versionCode `1029101`, version `1.1`, minSdk `29`, targetSdk `35`, ABI `arm64-v8a` |
 | Permissions and service | `INTERNET`, `ACCESS_NETWORK_STATE`, `FOREGROUND_SERVICE`, `FOREGROUND_SERVICE_DATA_SYNC`, and `POST_NOTIFICATIONS`; `ServiceMonitor` foreground service type `dataSync` |
 | Signature | `apksigner` verification PASS: v2 debug signature |
 
@@ -52,7 +54,7 @@ above:
 
 ```sh
 aapt dump badging android/duifene_sign.apk
-# package: name='org.example.duifene_sign' versionCode='11' versionName='1.1'
+# package: name='org.example.duifene_sign' versionCode='1029101' versionName='1.1'
 # sdkVersion:'29'; targetSdkVersion:'35'; native-code: 'arm64-v8a'
 # uses-permission: INTERNET, ACCESS_NETWORK_STATE, FOREGROUND_SERVICE,
 #   FOREGROUND_SERVICE_DATA_SYNC, POST_NOTIFICATIONS
