@@ -1,129 +1,172 @@
-import threading
 import time
-from datetime import datetime
-from api_client import ApiClient
+from collections.abc import Mapping
 
 
 class SignService:
-    def __init__(self, api: ApiClient):
+    """Platform-neutral check-in polling engine.
+
+    Android-specific code owns the foreground-service lifecycle and supplies an
+    Event-compatible stop object to ``run``.
+    """
+
+    COURSE_REFRESH_SECONDS = 10 * 60
+    NORMAL_POLL_DELAY = 1
+    NETWORK_ERROR_DELAY = 5
+
+    def __init__(self, api, on_log=None, on_status=None):
         self.api = api
+        self.on_log = on_log
+        self.on_status = on_status
         self._running = False
-        self._thread = None
         self._course_id = ""
         self._class_id = ""
         self._class_name = ""
         self._countdown = 10
-        self._checked_ids: set = set()
-        self._heartbeat = 0
-        self.on_log = None          # callback(level, message)
-        self.on_status = None       # callback(running: bool)
+        self._checked_ids = set()
+        self._last_course_refresh = None
+        self.next_poll_delay = self.NORMAL_POLL_DELAY
 
     @property
-    def is_running(self) -> bool:
+    def is_running(self):
         return self._running
 
     @property
-    def class_name(self) -> str:
+    def class_name(self):
         return self._class_name
 
-    def start(self, course_id: str, class_id: str,
-              class_name: str, countdown: int = 10):
-        self._course_id = course_id
-        self._class_id = class_id
-        self._class_name = class_name
-        self._countdown = countdown
+    def configure(self, course_id, class_id, class_name, countdown=10):
+        self._course_id = str(course_id)
+        self._class_id = str(class_id)
+        self._class_name = str(class_name)
+        try:
+            self._countdown = int(countdown)
+        except (TypeError, ValueError):
+            self._countdown = 10
         self._checked_ids.clear()
-        self._heartbeat = 0
+        self._last_course_refresh = None
+        self.next_poll_delay = self.NORMAL_POLL_DELAY
 
-        if not self.api.enter_course(course_id):
-            self._emit_log("warn", "进入课程页面失败，请重新登录")
+    def poll_once(self):
+        """Poll once and return whether the caller should keep running."""
+        self.next_poll_delay = self.NORMAL_POLL_DELAY
+        try:
+            if not self.api.check_login():
+                self._emit_log("warn", "Login expired; polling stopped.")
+                self._set_running(False)
+                return False
+
+            self._refresh_course_if_due()
+            self._handle_activity(self.api.check_sign_activity(self._class_id))
+        except Exception as exc:
+            self.next_poll_delay = self.NETWORK_ERROR_DELAY
+            self._emit_log("error", f"Polling request failed: {exc}")
+        return True
+
+    def run(self, stop_event):
+        """Poll until stopped, using Event.wait so shutdown interrupts sleep."""
+        self._set_running(True)
+        try:
+            while not stop_event.is_set() and self._running:
+                if not self.poll_once():
+                    break
+                stop_event.wait(self.next_poll_delay)
+        finally:
+            self._set_running(False)
+
+    def _refresh_course_if_due(self):
+        now = time.monotonic()
+        if (
+            self._last_course_refresh is not None
+            and now - self._last_course_refresh < self.COURSE_REFRESH_SECONDS
+        ):
             return
 
-        self._running = True
-        self._emit_log("info",
-            f"开始监听【{class_name}】\nCourseID: {course_id}\nTClassID: {class_id}")
-        if self.on_status:
-            self.on_status(True)
+        entered = self.api.enter_course(self._course_id)
+        if not entered:
+            self._emit_log("warn", "Unable to refresh course context.")
+            return
+        self._last_course_refresh = now
 
-        self._thread = threading.Thread(target=self._loop, daemon=True)
-        self._thread.start()
-
-    def stop(self):
-        self._running = False
-        if self._thread and self._thread.is_alive():
-            self._thread.join(timeout=2)
-        self._emit_log("info", "监控已停止")
-        if self.on_status:
-            self.on_status(False)
-
-    def _loop(self):
-        while self._running:
-            try:
-                self._tick()
-            except Exception as e:
-                self._emit_log("error", f"轮询异常: {e}")
-            time.sleep(1)
-
-    def _tick(self):
-        if not self.api.check_login():
-            self._emit_log("warn", "登录状态已失效，请重新登录")
-            self._running = False
-            if self.on_status:
-                self.on_status(False)
+    def _handle_activity(self, activity):
+        if not isinstance(activity, Mapping):
             return
 
-        activity = self.api.check_sign_activity(self._class_id)
-        if activity is None:
-            self._heartbeat += 1
-            if self._heartbeat % 30 == 0:
-                self._emit_log("info",
-                    f"[{datetime.now().strftime('%H:%M:%S')}] 监控中...")
-            return
-        self._heartbeat = 0
-
-        checkin_id = activity["checkin_id"]
-        class_ids = activity["class_ids"]
-
-        if self._class_id not in class_ids:
+        checkin_id = activity.get("checkin_id")
+        class_ids = activity.get("class_ids")
+        if checkin_id is None or not isinstance(class_ids, (list, tuple, set)):
             return
 
+        checkin_id = str(checkin_id)
+        if not checkin_id or self._class_id not in {str(value) for value in class_ids}:
+            return
         if checkin_id in self._checked_ids:
             return
 
-        check_type = activity["type"]
-        seconds = int(activity["seconds"])
-        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        try:
+            seconds = int(activity.get("seconds"))
+        except (TypeError, ValueError):
+            self._emit_log("warn", "Ignored activity with invalid countdown.")
+            return
 
+        check_type = str(activity.get("type", ""))
+        type_name = {
+            "1": "签到码",
+            "2": "二维码",
+            "3": "定位",
+        }.get(check_type)
+        if type_name is None:
+            return
         if seconds > self._countdown:
-            tname = {"1": "签到码", "2": "二维码", "3": "定位"}.get(check_type, "未知")
-            self._emit_log("info",
-                f"[{now}] {tname}签到 倒计时{seconds}秒，等待中...")
+            self._emit_log(
+                "info",
+                f"检测到{type_name}签到，剩余 {seconds} 秒，等待中。",
+            )
             return
 
-        self._emit_log("info",
-            f"\n{'='*30}\n[{now}] 检测到签到 ID:{checkin_id}")
-
+        self._emit_log(
+            "info",
+            f"{type_name}签到剩余 {seconds} 秒，开始签到。",
+        )
         if check_type == "1":
-            code = activity["code"]
-            self._emit_log("info", f"类型: 签到码 ({code})")
-            msg = self.api.do_code_signin(code)
+            code = activity.get("code")
+            if code is None:
+                return
+            message = self.api.do_code_signin(str(code))
         elif check_type == "2":
-            self._emit_log("info", "类型: 二维码")
-            msg = self.api.do_qrcode_signin(checkin_id)
+            message = self.api.do_qrcode_signin(checkin_id)
         elif check_type == "3":
-            lng, lat = activity["longitude"], activity["latitude"]
-            self._emit_log("info", f"类型: 定位 ({lng}, {lat})")
-            msg = self.api.do_location_signin(lng, lat)
+            longitude = activity.get("longitude")
+            latitude = activity.get("latitude")
+            if longitude is None or latitude is None:
+                return
+            message = self.api.do_location_signin(longitude, latitude)
         else:
             return
 
-        if "成功" in msg:
-            self._emit_log("success", f"✅ {msg}")
+        if "成功" in str(message):
             self._checked_ids.add(checkin_id)
+            self._emit_log("success", str(message))
         else:
-            self._emit_log("error", f"❌ {msg}")
-        self._emit_log("info", f"{'='*30}\n")
+            self._emit_log("error", str(message))
 
-    def _emit_log(self, level: str, message: str):
-        if self.on_log:
+    def _set_running(self, running):
+        if self._running == running:
+            return
+        self._running = running
+        self._emit_status(running)
+
+    def _emit_log(self, level, message):
+        if self.on_log is None:
+            return
+        try:
             self.on_log(level, message)
+        except Exception:
+            pass
+
+    def _emit_status(self, running):
+        if self.on_status is None:
+            return
+        try:
+            self.on_status(running)
+        except Exception:
+            pass

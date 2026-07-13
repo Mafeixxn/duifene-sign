@@ -4,12 +4,27 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/python-3.8+-blue.svg" alt="Python">
+  <img src="https://img.shields.io/badge/python-3.10+-blue.svg" alt="Python">
   <img src="https://img.shields.io/badge/platform-Windows%20%7C%20Android-lightgrey.svg" alt="Platform">
   <img src="https://img.shields.io/badge/license-MIT-green.svg" alt="License">
   <img src="https://img.shields.io/github/v/release/Mafeixxn/duifene-sign" alt="Release">
   <img src="https://img.shields.io/github/stars/Mafeixxn/duifene-sign?style=social" alt="Stars">
 </p>
+
+---
+
+## 目录
+
+- [项目简介](#-项目简介)
+- [快速下载](#-快速下载)
+- [功能特性](#-功能特性)
+- [签到类型支持](#-签到类型支持)
+- [Windows 桌面版使用](#windows-桌面版使用)
+- [Android 版使用](#-android-版使用)
+- [目录结构](#-目录结构)
+- [自动构建](#-自动构建)
+- [主要依赖](#-主要依赖)
+- [免责声明](#免责声明)
 
 ---
 
@@ -19,31 +34,39 @@
 
 本项目支持两种登录方式：
 
-- 微信 OAuth 链接登录：支持数字码、二维码、GPS 三种签到类型
-- 账号密码登录：支持数字码和 GPS 签到，不支持二维码签到
+| 登录方式 | 支持能力 | 备注 |
+|----------|----------|------|
+| 微信 OAuth 链接登录 | 数字码、二维码、GPS 三种签到类型 | 推荐使用 |
 
 > [!WARNING]
 > - 经过测试,有一部分手机无法使用,具体原因未知
 > - 监听签到期间请关闭代理/VPN 软件，否则有概率导致签到请求连接超时，错过签到
 > - 使用前务必先创一个课程测试一下,有问题就反馈一下,后续我可能会改进
-> - 建议链接登录，因为账号密码登录有bug
   
 ## 📥 快速下载
 
-| 版本 | 适用平台 | 获取方式 |
-|------|---------|----------|
-| Android APK | Android 7.0+ | 下载 [`android/duifene_sign.apk`](android/duifene_sign.apk) |
-| Windows 桌面版 | Windows 10 / 11 | [GitHub Releases](../../releases) 下载 exe，或克隆仓库运行源码 |
+| 版本 | 适用平台 | 获取方式 | 适合场景 |
+|------|----------|----------|----------|
+| Android APK | Android 10+ (API 29) | [下载最新 APK](https://github.com/Mafeixxn/duifene-sign/releases/latest/download/duifene_sign.apk)，或下载仓库中的 [`android/duifene_sign.apk`](android/duifene_sign.apk) | 手机直接安装使用 |
+| Windows 桌面版 | Windows 10 / 11 | [下载最新 EXE](https://github.com/Mafeixxn/duifene-sign/releases/latest/download/duifene_sign_windows.exe)，或进入 [GitHub Releases](../../releases) | 桌面监听与签到 |
+
+> [!TIP]
+> 推荐从 [最新 Release](../../releases/latest) 下载。每个 Release 会同时提供 Windows EXE 和 Android APK，无需安装 Python 或自行构建。
 
 ## ✨ 功能特性
 
-- 微信链接登录：粘贴微信 OAuth 回调链接即可登录
-- 账号密码登录：可直接使用对分易账号和密码登录
-- 会话保持：自动保存 Cookie，下次启动可恢复登录状态
-- 课程选择：自动拉取课程列表，支持切换目标课程
-- 提前签到：可设置倒计时提前量，提前尝试完成签到
-- 签到通知：Windows 版支持桌面通知提醒签到结果
-- 多端支持：提供 Windows tkinter 桌面版和 Android Kivy 版
+| 功能 | 说明 |
+|------|------|
+| 微信链接登录 | 粘贴微信 OAuth 回调链接即可登录。 |
+| 会话保持 | 自动保存 Cookie，下次启动可恢复登录状态。 |
+| 配置保护 | Windows 版使用本地 `duifenyi.ini` 保存运行配置，仓库仅保留 `duifenyi.example.ini` 模板。 |
+| 课程选择 | 自动拉取课程列表，支持切换目标课程。 |
+| 提前签到 | 可设置倒计时提前量，提前尝试完成签到。 |
+| 倒计时日志 | 检测到签到活动后显示剩余秒数，并在达到设定值时开始签到。 |
+| 签到通知 | Windows 版支持桌面通知提醒签到结果。 |
+| 后台监听 | Android 版使用前台服务，在切到后台或锁屏后继续监听。 |
+| 中文移动界面 | Android 版内置中文字体并适配 Android 15 系统状态栏。 |
+| 多端支持 | 提供 Windows tkinter 桌面版和 Android Kivy 版。 |
 
 ## 📋 签到类型支持
 
@@ -55,9 +78,13 @@
 
 ## 🖥️ Windows 桌面版使用
 
-### 直接下载exe的话就请跳到第三步
+> [!IMPORTANT]
+> 直接下载并运行 [duifene_sign_windows.exe](https://github.com/Mafeixxn/duifene-sign/releases/latest/download/duifene_sign_windows.exe)，可以跳过“安装依赖”和“启动程序”，直接从“登录方式”开始。
 
 ### 1. 安装依赖
+
+> [!TIP]
+> Windows 源码运行建议使用 Python 3.10 及以上版本。
 
 ```bash
 git clone https://github.com/Mafeixxn/duifene-sign.git
@@ -73,6 +100,9 @@ python main.py
 
 也可以双击 `对分易签到.pyw` 启动无控制台窗口版本
 
+> [!NOTE]
+> 程序首次运行会在本地生成或更新 `duifenyi.ini`。该文件可能包含用于恢复登录状态的 Cookie，请不要提交到 Git，也不要分享给他人。
+
 ### 3. 登录方式
 
 #### 微信链接登录（推荐）
@@ -86,10 +116,6 @@ python main.py
 2. 打开后点击右上角菜单，复制当前链接
 3. 将复制到的链接粘贴到程序输入框，点击登录
 
-#### 账号密码登录
-
-直接输入对分易账号和密码即可登录(不支持二维码签到)
-
 ### 4. 开始签到
 
 1. 登录成功后，在课程下拉框中选择需要监听的课程
@@ -101,17 +127,21 @@ python main.py
 
 ### 直接安装
 
-下载 [`android/duifene_sign.apk`](android/duifene_sign.apk) 并安装到 Android 手机即可
+从 [GitHub Releases 下载最新 APK](https://github.com/Mafeixxn/duifene-sign/releases/latest/download/duifene_sign.apk)，或下载仓库中的 [`android/duifene_sign.apk`](android/duifene_sign.apk)，然后安装到 Android 手机即可。
 
-具体步骤
+首次安装时，Android 可能提示“允许安装未知应用”；请只安装本项目 Release 页面或仓库中提供的 APK。覆盖安装新版前建议先停止监听。
 
-1.在微信将上面链接发到聊天里面(或者收藏),然后点开,出现一个PDF文件预览画面(无内容)
+具体步骤：
 
-2.点开右上角三个点,在浏览器打开
+1. 在微信中将上面的 OAuth 链接发送到聊天（或收藏），然后点开，进入 PDF 文件预览页面（内容可能为空）
 
-3.然后复制浏览器里面的链接
+2. 点击右上角三个点，选择在浏览器中打开
 
-4.将链接粘贴到本软件的oauth链接输入框,点微信登录
+3. 复制浏览器地址栏中的完整链接
+
+4. 将链接粘贴到软件的「微信 OAuth 链接」输入框，点击「登录并加载课程」
+
+5. 选择课程、填写倒计时提前量并开始监听；检测到签到后，运行记录会显示剩余秒数和签到结果
 
 
 ### 自行构建 APK
@@ -143,21 +173,28 @@ python main.py
 │   ├── build_apk.ipynb   # Google Colab 构建脚本
 │   └── duifene_sign.apk  # 预构建 APK 安装包
 ├── windows/              # Windows tkinter 桌面版
-│   ├── main.py           # 程序入口
-│   ├── app.py            # tkinter 图形界面
-│   ├── api_client.py     # 对分易 API 封装
-│   ├── sign_service.py   # 签到监控逻辑
-│   ├── config_manager.py # 配置存取
-│   ├── duifenyi.ini      # 配置文件模板
-│   ├── requirements.txt  # 依赖清单
-│   └── 对分易签到.pyw     # 无控制台启动入口
+│   ├── main.py              # 程序入口
+│   ├── app.py               # tkinter 图形界面
+│   ├── api_client.py        # 对分易 API 封装
+│   ├── sign_service.py      # 签到监控逻辑
+│   ├── config_manager.py    # 配置存取
+│   ├── duifenyi.example.ini # 配置模板，实际运行使用本地 duifenyi.ini
+│   ├── requirements.txt     # 依赖清单
+│   └── 对分易签到.pyw        # 无控制台启动入口
 ├── LICENSE
 └── README.md
 ```
 
 ## 🔧 自动构建
 
-推送版本标签（`v*`）后，GitHub Actions 会自动构建 Windows exe 并发布到 [Releases](../../releases)，同时附带预构建的 Android APK
+推送版本标签（`v*`）后，GitHub Actions 会自动构建 Windows EXE，并将它和仓库中的预构建 Android APK 一起发布到 [Releases](../../releases)。Release 附件名称固定为 `duifene_sign_windows.exe` 和 `duifene_sign.apk`，README 的“最新下载”链接会自动指向最新版本。
+
+> [!TIP]
+> 发布前建议确认：
+>
+> - Windows 依赖已安装完整。
+> - `duifenyi.ini` 没有被提交或打包进源码仓库。
+> - Release 页面中的 exe 与当前标签版本一致。
 
 ## 📦 主要依赖
 
@@ -193,3 +230,14 @@ python main.py
 ## 📄 License
 
 [![MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+
+## Android 10+ 使用说明
+
+Android 版本需要 **Android 10（API 29）或更高版本**，仅支持通过微信 OAuth 回调链接登录。程序不提供账号、密码登录入口；请按上文步骤将微信中复制的 OAuth 链接粘贴到应用中。
+
+开始监听后，应用会启动一个前台服务并显示持续通知。这使监听在应用转入后台或设备锁屏后仍能继续；请保留该通知，并不要从系统设置中强行停止应用。
+
+Android 13 及更高版本在首次开始监听前会请求「通知」权限，请选择允许。拒绝通知权限后，应用不会启动监听；通知随后被关闭或系统限制了后台活动时，已启动的监听仍可能被中断。
+
+> [!TIP]
+> 为获得较可靠的后台行为，请将本应用设为允许后台运行，并在手机的电池优化、节电、自启动、任务清理等设置中排除或允许它。不同厂商的系统策略不同，无法保证在所有设备上都不会被系统停止。
